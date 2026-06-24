@@ -5,7 +5,6 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-# CRITICAL: needs write permission to create releases
 permissions:
   contents: write
   actions: read
@@ -17,7 +16,7 @@ jobs:
     timeout-minutes: 120
 
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Java 17
@@ -31,126 +30,144 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install system dependencies
+      - name: Install system deps
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y \
             git zip unzip curl \
             build-essential \
             libssl-dev libffi-dev \
-            libsqlite3-dev \
-            zlib1g-dev \
-            libncurses5-dev \
-            libreadline-dev \
+            libsqlite3-dev zlib1g-dev \
+            libncurses5-dev libreadline-dev \
             libpng-dev libjpeg-dev \
             ccache automake autoconf \
-            cmake libtool pkg-config \
-            lld patchelf
+            cmake libtool pkg-config lld \
+            python3-dev
 
-      - name: Set up Android SDK components
+      - name: Set up Android SDK
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
             "platform-tools" \
             "platforms;android-33" \
             "build-tools;33.0.2" \
             "ndk;25.2.9519653"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
 
-      - name: Install Python build tools
+      - name: Install buildozer + p4a
         run: |
-          pip install --upgrade pip wheel
+          pip install --upgrade pip wheel setuptools
           pip install \
             "buildozer==1.5.0" \
             "cython==0.29.37" \
             "python-for-android==2023.9.16" \
-            virtualenv
+            "colorama" \
+            "appdirs" \
+            "sh>=1.14.1,<2"
 
-      - name: Cache buildozer
+      - name: Cache buildozer global dir
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.buildozer
-            ~/.cache/pip
-          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v2
+          path: ~/.buildozer
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v4
           restore-keys: |
-            buildozer-${{ runner.os }}-
+            buildozer-${{ runner.os }}-v4
 
       - name: Build APK
+        env:
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
         run: |
-          export ANDROID_SDK_ROOT=$ANDROID_HOME
-          export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653
-          export PATH=$PATH:$ANDROID_HOME/platform-tools
-          # Run buildozer and capture output
+          # Make buildozer output visible AND catch errors
           buildozer -v android debug 2>&1 | tee build.log
-          echo "=== BUILD COMPLETE ==="
-          echo "APK files:"
-          find . -name "*.apk" 2>/dev/null || echo "No APK found"
+          BUILD_EXIT=${PIPESTATUS[0]}
+          echo "Buildozer exit code: $BUILD_EXIT"
 
-      - name: Verify APK exists
-        run: |
-          APK_PATH=$(find . -name "*.apk" | head -1)
-          if [ -z "$APK_PATH" ]; then
-            echo "ERROR: No APK found!"
+          echo ""
+          echo "=== APK SEARCH ==="
+          find . -name "*.apk" 2>/dev/null
+          echo "=== BIN DIR ==="
+          ls -la bin/ 2>/dev/null || echo "no bin/"
+          echo "=== BUILDOZER BIN ==="
+          find .buildozer -name "*.apk" 2>/dev/null | head -10 || echo "none"
+
+          if [ "$BUILD_EXIT" != "0" ]; then
+            echo "BUILD FAILED — last 100 lines:"
             tail -100 build.log
             exit 1
           fi
-          echo "APK_PATH=$APK_PATH" >> $GITHUB_ENV
-          echo "APK_NAME=$(basename $APK_PATH)" >> $GITHUB_ENV
-          echo "APK found: $APK_PATH"
-          ls -lh "$APK_PATH"
+
+      - name: Locate APK
+        id: locate_apk
+        run: |
+          # Try bin/ first (standard buildozer output)
+          APK=$(find bin -name "*.apk" 2>/dev/null | head -1)
+          # Fall back to inside .buildozer cache
+          if [ -z "$APK" ]; then
+            APK=$(find .buildozer -name "*.apk" 2>/dev/null | head -1)
+          fi
+          if [ -z "$APK" ]; then
+            echo "ERROR: APK not found after successful build"
+            exit 1
+          fi
+          echo "apk_path=$APK" >> $GITHUB_OUTPUT
+          echo "apk_name=$(basename $APK)" >> $GITHUB_OUTPUT
+          SIZE=$(du -sh "$APK" | cut -f1)
+          echo "APK: $APK ($SIZE)"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: luo-world-apk
-          path: ${{ env.APK_PATH }}
+          name: luo-world-v0.2-build${{ github.run_number }}
+          path: ${{ steps.locate_apk.outputs.apk_path }}
           retention-days: 30
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.1.${{ github.run_number }}
-          name: "🌿 Luo World v0.1.${{ github.run_number }}"
+          tag_name: v0.2.${{ github.run_number }}
+          name: "🌿 Luo World v0.2.${{ github.run_number }}"
           body: |
-            ## 🎮 Luo World APK — Build #${{ github.run_number }}
+            ## 🎮 Luo World — Session 3 Build #${{ github.run_number }}
 
-            **Commit:** `${{ github.sha }}`
+            **APK:** `${{ steps.locate_apk.outputs.apk_name }}`
             **Target:** Android ARM64 — Poco X3 NFC ✅
             **Min Android:** 8.0 (API 26)
 
             ### ⬇️ Install
-            1. Download the `.apk` file below
-            2. On your Poco X3 NFC: Settings → Security → Install unknown apps → ON
-            3. Tap the APK to install → Launch **Luo World**
+            1. Download the `.apk` below
+            2. Settings → Security → Install unknown apps → **ON**
+            3. Open APK → Install → **Play**
 
             ### 🕹️ Controls
             | Control | Action |
             |---------|--------|
             | Left joystick | Move |
-            | Right joystick | Camera |
-            | ⚔ button | Attack / Chop / Mine |
-            | E button | Pick up / Interact |
-            | USE button | Eat / Drink |
-            | 🎒 button | Inventory |
+            | Right joystick | Camera orbit |
+            | ⚔ | Attack / Chop tree / Hunt |
+            | E | Interact / Pick up / Fill cup |
+            | USE | Eat food / Drink water |
+            | 🎒 | Open inventory |
+            | ↑ | Jump |
 
-            ### 🌿 What's in this build
-            - Massive jungle world (512×512 units — 8x bigger)
-            - 600 trees, 300 rocks, 200 vine patches
-            - Starting: stone axe + 3x cooked meat + wooden cup
-            - Survival: health, hunger, thirst, stamina
-            - Chop trees → logs. Mine rocks → stone + flint. Pick up vines
-            - Day/night cycle
-          files: ${{ env.APK_PATH }}
-          draft: false
-          prerelease: false
+            ### 🌿 Session 3 — New This Build
+            - **Crafting UI** — tap ⚒ CRAFT to open recipe browser (5 categories, all recipes visible, tap CRAFT to make items)
+            - **Inventory screen** — 24-slot grid, tap item to equip/use/drop
+            - **Live minimap** — top-right corner, tap to expand fullscreen
+            - **Sound system** — footsteps, chopping, crafting, eating
+            - **Splash screen + icon** — real app icon on your home screen
+            - **Sky color** changes with time of day (dawn/day/dusk/night)
+            - **Jump button** added to action bar
+
+            ### 🌍 World (unchanged — still massive)
+            - 512×512 jungle · 5 biomes · 600 trees · 300 rocks
+            - River + 8 ponds · 195 animals · berries · mushrooms
+          files: ${{ steps.locate_apk.outputs.apk_path }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload build log on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: build-log-failure
+          name: build-log-failure-${{ github.run_number }}
           path: build.log
           retention-days: 7
