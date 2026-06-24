@@ -42,7 +42,7 @@ jobs:
             libpng-dev libjpeg-dev \
             ccache automake autoconf \
             cmake libtool pkg-config lld \
-            python3-dev
+            python3-dev openjdk-17-jdk
 
       - name: Set up Android SDK
         run: |
@@ -53,115 +53,100 @@ jobs:
             "build-tools;33.0.2" \
             "ndk;25.2.9519653"
 
-      - name: Install buildozer + p4a
+      - name: Install buildozer (pinned working versions)
         run: |
           pip install --upgrade pip wheel setuptools
           pip install \
+            "Cython==0.29.33" \
             "buildozer==1.5.0" \
-            "cython==0.29.37" \
-            "python-for-android==2023.9.16" \
-            "colorama" \
-            "appdirs" \
-            "sh>=1.14.1,<2"
+            "sh==1.14.3" \
+            "appdirs==1.4.4" \
+            "colorama==0.4.6" \
+            "python-for-android==2023.9.16"
 
-      - name: Cache buildozer global dir
+      - name: Cache buildozer
         uses: actions/cache@v4
         with:
-          path: ~/.buildozer
-          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v4
+          path: |
+            ~/.buildozer
+            ~/.cache/pip
+          key: buildozer-${{ runner.os }}-kivy221-v5
           restore-keys: |
-            buildozer-${{ runner.os }}-v4
+            buildozer-${{ runner.os }}-kivy221
 
       - name: Build APK
         env:
           ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         run: |
-          # Make buildozer output visible AND catch errors
           buildozer -v android debug 2>&1 | tee build.log
           BUILD_EXIT=${PIPESTATUS[0]}
-          echo "Buildozer exit code: $BUILD_EXIT"
-
           echo ""
-          echo "=== APK SEARCH ==="
-          find . -name "*.apk" 2>/dev/null
-          echo "=== BIN DIR ==="
+          echo "=== Buildozer exit: $BUILD_EXIT ==="
+          echo "=== APK search ==="
+          find . -name "*.apk" 2>/dev/null || true
           ls -la bin/ 2>/dev/null || echo "no bin/"
-          echo "=== BUILDOZER BIN ==="
-          find .buildozer -name "*.apk" 2>/dev/null | head -10 || echo "none"
-
           if [ "$BUILD_EXIT" != "0" ]; then
-            echo "BUILD FAILED — last 100 lines:"
-            tail -100 build.log
+            echo "=== LAST 150 LINES OF BUILD LOG ==="
+            tail -150 build.log
             exit 1
           fi
 
       - name: Locate APK
-        id: locate_apk
+        id: apk
         run: |
-          # Try bin/ first (standard buildozer output)
           APK=$(find bin -name "*.apk" 2>/dev/null | head -1)
-          # Fall back to inside .buildozer cache
-          if [ -z "$APK" ]; then
-            APK=$(find .buildozer -name "*.apk" 2>/dev/null | head -1)
-          fi
-          if [ -z "$APK" ]; then
-            echo "ERROR: APK not found after successful build"
-            exit 1
-          fi
+          [ -z "$APK" ] && APK=$(find .buildozer -name "*.apk" 2>/dev/null | head -1)
+          [ -z "$APK" ] && { echo "No APK found"; exit 1; }
           echo "apk_path=$APK" >> $GITHUB_OUTPUT
-          echo "apk_name=$(basename $APK)" >> $GITHUB_OUTPUT
-          SIZE=$(du -sh "$APK" | cut -f1)
-          echo "APK: $APK ($SIZE)"
+          echo "Found: $APK ($(du -sh $APK | cut -f1))"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: luo-world-v0.2-build${{ github.run_number }}
-          path: ${{ steps.locate_apk.outputs.apk_path }}
+          name: LuoWorld-v0.2-build${{ github.run_number }}
+          path: ${{ steps.apk.outputs.apk_path }}
           retention-days: 30
 
-      - name: Create GitHub Release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v0.2.${{ github.run_number }}
           name: "🌿 Luo World v0.2.${{ github.run_number }}"
           body: |
-            ## 🎮 Luo World — Session 3 Build #${{ github.run_number }}
+            ## 🎮 Luo World — Build #${{ github.run_number }}
 
-            **APK:** `${{ steps.locate_apk.outputs.apk_name }}`
             **Target:** Android ARM64 — Poco X3 NFC ✅
             **Min Android:** 8.0 (API 26)
 
             ### ⬇️ Install
-            1. Download the `.apk` below
-            2. Settings → Security → Install unknown apps → **ON**
-            3. Open APK → Install → **Play**
+            1. Download `.apk` below
+            2. Settings → Security → Install unknown apps → **ON**  
+            3. Tap APK → Install → **Play**
 
             ### 🕹️ Controls
-            | Control | Action |
-            |---------|--------|
-            | Left joystick | Move |
-            | Right joystick | Camera orbit |
-            | ⚔ | Attack / Chop tree / Hunt |
-            | E | Interact / Pick up / Fill cup |
-            | USE | Eat food / Drink water |
-            | 🎒 | Open inventory |
+            | | |
+            |---|---|
+            | Left stick | Move |
+            | Right stick | Camera |
+            | ⚔ | Attack / Chop / Hunt |
+            | E | Interact / Pick up / Fill cup / Add fuel |
+            | USE | Eat / Drink |
+            | 🎒 | Inventory |
             | ↑ | Jump |
 
-            ### 🌿 Session 3 — New This Build
-            - **Crafting UI** — tap ⚒ CRAFT to open recipe browser (5 categories, all recipes visible, tap CRAFT to make items)
-            - **Inventory screen** — 24-slot grid, tap item to equip/use/drop
-            - **Live minimap** — top-right corner, tap to expand fullscreen
-            - **Sound system** — footsteps, chopping, crafting, eating
-            - **Splash screen + icon** — real app icon on your home screen
-            - **Sky color** changes with time of day (dawn/day/dusk/night)
-            - **Jump button** added to action bar
+            ### 🔥 New in Session 4
+            - **Campfire** — place with 3 logs + 2 sticks + 1 flint, cooks meat in 8s, burns 10 min, refuel with [E]
+            - **Weather** — 6 states: clear/cloudy/rain/heavy rain/storm/fog, each affects speed/visibility
+            - **Storm lightning** — screen flashes, 55% speed, fires go out
+            - **Temperature** — body temp tracked, cold night + rain = hypothermia, fire = survival
+            - **Torch** (stick + vine) · **Stone Knife** (flint x2 + stick)
+            - Cooked mushroom · Roasted fruit from campfire
 
-            ### 🌍 World (unchanged — still massive)
-            - 512×512 jungle · 5 biomes · 600 trees · 300 rocks
-            - River + 8 ponds · 195 animals · berries · mushrooms
-          files: ${{ steps.locate_apk.outputs.apk_path }}
+            ### 🌍 World
+            512×512 jungle · 5 biomes · 600 trees · 300 rocks · river + 8 ponds · 195 animals
+          files: ${{ steps.apk.outputs.apk_path }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload build log on failure

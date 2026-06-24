@@ -6,11 +6,11 @@ package.domain = com.luokai25
 source.dir = .
 source.include_exts = py,png,jpg,jpeg,wav,ogg,mp3,ttf,json,txt,kv
 source.include_patterns = assets/*,game/*,engine/*,ui/*,data/*
-source.exclude_dirs = tests,bin,.buildozer,.git,.github,__pycache__,assets/models
+source.exclude_dirs = tests,bin,.buildozer,.git,.github,__pycache__,assets/models,engine/__pycache__,game/__pycache__,ui/__pycache__
 
 version = 0.2.0
 
-requirements = python3==3.10.14,kivy==2.3.1,pillow,android
+requirements = python3==3.10.14,kivy==2.2.1,android
 
 orientation = landscape
 fullscreen = 1
