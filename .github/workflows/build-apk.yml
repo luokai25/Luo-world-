@@ -3,156 +3,154 @@ name: Build Luo World APK
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:   # manual trigger from GitHub UI
+  workflow_dispatch:
+
+# CRITICAL: needs write permission to create releases
+permissions:
+  contents: write
+  actions: read
 
 jobs:
   build-apk:
     name: Build Android APK
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    timeout-minutes: 120
 
     steps:
-      # ── 1. Checkout ──────────────────────────────
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # ── 2. Java 17 (required by Android build tools) ──
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      # ── 3. Python 3.10 (best p4a compat) ──────────
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # ── 4. System dependencies ────────────────────
       - name: Install system dependencies
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y \
-            git zip unzip \
+            git zip unzip curl \
             build-essential \
             libssl-dev libffi-dev \
             libsqlite3-dev \
             zlib1g-dev \
             libncurses5-dev \
-            libgdbm-dev \
-            libnss3-dev \
             libreadline-dev \
-            libpng-dev \
-            libjpeg-dev \
-            ccache \
-            automake \
-            autoconf \
-            cmake \
-            libtool \
-            pkg-config \
-            lld
+            libpng-dev libjpeg-dev \
+            ccache automake autoconf \
+            cmake libtool pkg-config \
+            lld patchelf
 
-      # ── 5. Android SDK/NDK (pre-installed on ubuntu-22.04) ──
-      - name: Set up Android SDK
+      - name: Set up Android SDK components
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          ls $ANDROID_HOME/
-          # Install required SDK components
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
             "platform-tools" \
             "platforms;android-33" \
             "build-tools;33.0.2" \
             "ndk;25.2.9519653"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
 
-      # ── 6. Python build deps ──────────────────────
-      - name: Install Python dependencies
+      - name: Install Python build tools
         run: |
-          pip install --upgrade pip
+          pip install --upgrade pip wheel
           pip install \
-            buildozer==1.5.0 \
-            cython==0.29.37 \
-            python-for-android \
+            "buildozer==1.5.0" \
+            "cython==0.29.37" \
+            "python-for-android==2023.9.16" \
             virtualenv
 
-      # ── 7. Buildozer cache (speeds up repeat builds) ──
-      - name: Cache buildozer global dir
+      - name: Cache buildozer
         uses: actions/cache@v4
         with:
-          path: ~/.buildozer
-          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
+          path: |
+            ~/.buildozer
+            ~/.cache/pip
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v2
           restore-keys: |
             buildozer-${{ runner.os }}-
 
-      # ── 8. Build APK ─────────────────────────────
-      - name: Build APK with Buildozer
+      - name: Build APK
         run: |
           export ANDROID_SDK_ROOT=$ANDROID_HOME
           export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653
           export PATH=$PATH:$ANDROID_HOME/platform-tools
+          # Run buildozer and capture output
           buildozer -v android debug 2>&1 | tee build.log
+          echo "=== BUILD COMPLETE ==="
+          echo "APK files:"
+          find . -name "*.apk" 2>/dev/null || echo "No APK found"
 
-      # ── 9. Upload APK as artifact ─────────────────
+      - name: Verify APK exists
+        run: |
+          APK_PATH=$(find . -name "*.apk" | head -1)
+          if [ -z "$APK_PATH" ]; then
+            echo "ERROR: No APK found!"
+            tail -100 build.log
+            exit 1
+          fi
+          echo "APK_PATH=$APK_PATH" >> $GITHUB_ENV
+          echo "APK_NAME=$(basename $APK_PATH)" >> $GITHUB_ENV
+          echo "APK found: $APK_PATH"
+          ls -lh "$APK_PATH"
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: luo-world-debug-apk
-          path: bin/*.apk
+          name: luo-world-apk
+          path: ${{ env.APK_PATH }}
           retention-days: 30
 
-      # ── 10. Create GitHub Release ─────────────────
-      - name: Get build info
-        id: build_info
-        run: |
-          APK=$(ls bin/*.apk 2>/dev/null | head -1)
-          echo "apk_path=$APK" >> $GITHUB_OUTPUT
-          echo "apk_name=$(basename $APK)" >> $GITHUB_OUTPUT
-          echo "build_date=$(date +'%Y-%m-%d %H:%M UTC')" >> $GITHUB_OUTPUT
-          echo "commit_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
-      - name: Create Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: build-${{ steps.build_info.outputs.commit_short }}
-          name: "🌿 Luo World - ${{ steps.build_info.outputs.build_date }}"
+          tag_name: v0.1.${{ github.run_number }}
+          name: "🌿 Luo World v0.1.${{ github.run_number }}"
           body: |
-            ## 🎮 Luo World APK
+            ## 🎮 Luo World APK — Build #${{ github.run_number }}
 
-            **Built from commit:** `${{ steps.build_info.outputs.commit_short }}`
-            **Build date:** ${{ steps.build_info.outputs.build_date }}
-            **Target:** Android ARM64 (Poco X3 NFC compatible)
+            **Commit:** `${{ github.sha }}`
+            **Target:** Android ARM64 — Poco X3 NFC ✅
             **Min Android:** 8.0 (API 26)
 
-            ### Install
-            1. Download the APK below
-            2. Enable "Install from unknown sources" in Android settings
-            3. Tap the APK to install
-            4. Launch **Luo World**
+            ### ⬇️ Install
+            1. Download the `.apk` file below
+            2. On your Poco X3 NFC: Settings → Security → Install unknown apps → ON
+            3. Tap the APK to install → Launch **Luo World**
 
-            ### Controls (touch)
-            - **Left joystick** — Move
-            - **Right joystick** — Camera
-            - **Attack button** — Chop / Hit
-            - **Interact button** — Pick up / Use
-            - **Inventory button** — Open bag
+            ### 🕹️ Controls
+            | Control | Action |
+            |---------|--------|
+            | Left joystick | Move |
+            | Right joystick | Camera |
+            | ⚔ button | Attack / Chop / Mine |
+            | E button | Pick up / Interact |
+            | USE button | Eat / Drink |
+            | 🎒 button | Inventory |
 
-            ### What's in this build
-            - Photorealistic jungle world
-            - 3rd person camera
-            - Starting items: stone axe, 3x cooked meat, wooden cup
-            - Survival stats: health, hunger, thirst, stamina
-          files: bin/*.apk
+            ### 🌿 What's in this build
+            - Massive jungle world (512×512 units — 8x bigger)
+            - 600 trees, 300 rocks, 200 vine patches
+            - Starting: stone axe + 3x cooked meat + wooden cup
+            - Survival: health, hunger, thirst, stamina
+            - Chop trees → logs. Mine rocks → stone + flint. Pick up vines
+            - Day/night cycle
+          files: ${{ env.APK_PATH }}
           draft: false
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── 11. Upload build log on failure ──────────
       - name: Upload build log on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: build-log
+          name: build-log-failure
           path: build.log
+          retention-days: 7
