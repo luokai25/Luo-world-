@@ -16,58 +16,180 @@ jobs:
     timeout-minutes: 120
 
     steps:
-      - name: Checkout
+      # ── MUST be first ──
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      # Use the dedicated buildozer Docker action - has everything pre-installed
-      # including correct NDK, SDK, Java, and all Kivy dependencies
-      - name: Build with Buildozer Action
-        uses: ArtemSBulgakov/buildozer-action@v1
-        id: buildozer
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
         with:
-          command: android debug
-          buildozer_version: stable
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y \
+            git zip unzip \
+            build-essential \
+            libssl-dev libffi-dev \
+            libsqlite3-dev zlib1g-dev \
+            libncurses5-dev libreadline-dev \
+            libpng-dev libjpeg-dev \
+            ccache automake autoconf \
+            cmake libtool pkg-config \
+            lld python3-dev \
+            openjdk-17-jdk-headless
+
+      - name: Configure Android SDK
+        run: |
+          # Accept all licenses
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          # Install exact versions needed
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platform-tools" \
+            "platforms;android-33" \
+            "build-tools;33.0.2" \
+            "ndk;25.2.9519653"
+          echo "NDK installed at: $ANDROID_HOME/ndk/25.2.9519653"
+          ls $ANDROID_HOME/ndk/
+
+      - name: Install Python build tools (pinned)
+        run: |
+          pip install --upgrade pip
+          # These exact versions are known to work together
+          pip install \
+            "Cython==0.29.33" \
+            "buildozer==1.5.0" \
+            "python-for-android==2023.9.16" \
+            "sh==1.14.3" \
+            "appdirs==1.4.4" \
+            "colorama==0.4.6" \
+            "jinja2==3.1.2" \
+            "certifi"
+
+      - name: Verify tools
+        run: |
+          echo "=== Tool versions ==="
+          java -version
+          javac -version
+          python3 --version
+          cython --version
+          buildozer version
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "NDK: $(ls $ANDROID_HOME/ndk/)"
+          echo "=== buildozer.spec requirements ==="
+          grep "^requirements" buildozer.spec
+
+      - name: Cache buildozer directory
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v7
+          restore-keys: |
+            buildozer-${{ runner.os }}-v7
+
+      - name: Build APK
+        env:
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+          # Tell buildozer not to download its own SDK/NDK
+          BUILDOZER_WARN_ON_ROOT: 0
+        run: |
+          # Run buildozer — capture output AND preserve exit code
+          set -o pipefail
+          yes | buildozer -v android debug 2>&1 | tee build.log
+          echo "Build exit code: ${PIPESTATUS[0]}"
+
+      - name: Find APK
+        id: find_apk
+        run: |
+          echo "=== Searching for APK ==="
+          find . -name "*.apk" 2>/dev/null | tee /tmp/apk_list.txt
+          APK=$(head -1 /tmp/apk_list.txt)
+          if [ -z "$APK" ]; then
+            echo "ERROR: No APK produced. Last 200 lines of build log:"
+            tail -200 build.log
+            exit 1
+          fi
+          echo "apk_path=$APK" >> $GITHUB_OUTPUT
+          echo "apk_name=$(basename $APK)" >> $GITHUB_OUTPUT
+          ls -lh "$APK"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LuoWorld-v0.2-build${{ github.run_number }}
-          path: ${{ steps.buildozer.outputs.filename }}
+          name: LuoWorld-APK-build${{ github.run_number }}
+          path: ${{ steps.find_apk.outputs.apk_path }}
           retention-days: 30
 
-      - name: Create Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v0.2.${{ github.run_number }}
           name: "🌿 Luo World v0.2.${{ github.run_number }}"
           body: |
-            ## 🎮 Luo World — Build #${{ github.run_number }}
+            ## 🎮 Luo World APK — Build #${{ github.run_number }}
 
-            **Target:** Android ARM64 — Poco X3 NFC ✅
-            **Min Android:** 8.0 (API 26)
+            **APK:** `${{ steps.find_apk.outputs.apk_name }}`
+            **Commit:** `${{ github.sha }}`
+
+            ### 📱 Compatibility
+            | Android Version | API | Supported |
+            |-----------------|-----|-----------|
+            | Android 5.0 Lollipop | 21 | ✅ |
+            | Android 6.0 Marshmallow | 23 | ✅ |
+            | Android 7.0 Nougat | 24 | ✅ |
+            | Android 8.0 Oreo | 26 | ✅ |
+            | Android 9 Pie | 28 | ✅ |
+            | Android 10 | 29 | ✅ Poco X3 NFC |
+            | Android 11 | 30 | ✅ |
+            | Android 12 | 31 | ✅ |
+            | Android 13 | 33 | ✅ |
+            | ARM64 (64-bit) | | ✅ |
+            | ARM32 (32-bit) | | ✅ |
 
             ### ⬇️ Install
             1. Download `.apk` below
-            2. Settings → Security → Install unknown apps → **ON**
+            2. Settings → Security → **Install unknown apps → ON**
             3. Tap APK → Install → **Play**
 
             ### 🕹️ Controls
-            | | |
-            |---|---|
-            | Left stick | Move |
-            | Right stick | Camera |
+            | Control | Action |
+            |---------|--------|
+            | Left joystick | Move |
+            | Right joystick | Camera |
             | ⚔ | Attack / Chop / Hunt |
-            | E | Interact / Pick up / Fill cup |
+            | E | Interact / Pick up / Fill cup / Refuel fire |
             | USE | Eat / Drink |
+            | 🔥 | Place campfire (needs 3 logs+2 sticks+1 flint) |
             | 🎒 | Inventory |
             | ↑ | Jump |
 
-            ### 🌿 Sessions 1-4 included
-            - 512×512 jungle world · 5 biomes · 600 trees · 300 rocks
-            - 195 animals (deer, boar, rabbit, bird) with flee AI
-            - Campfire system (place, cook, refuel)
-            - Weather: 6 states including storm + lightning
-            - Temperature: hypothermia/overheating survival mechanic
-            - Full crafting UI + inventory screen + minimap
-          files: ${{ steps.buildozer.outputs.filename }}
+            ### 🌿 Features
+            - 512×512 open jungle world
+            - 5 biomes: dense jungle · rainforest · clearing · rocky hills · swamp
+            - 600 trees · 300 rocks · river + 8 ponds · 195 animals
+            - Campfire: place, cook raw meat, refuel
+            - Weather: 6 states (clear/cloudy/rain/storm/fog) + lightning
+            - Temperature system: hypothermia/overheating
+            - Full crafting UI (15+ recipes)
+            - 24-slot inventory with durability tracking
+            - Live minimap (tap to expand)
+          files: ${{ steps.find_apk.outputs.apk_path }}
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ github.run_number }}
+          path: build.log
+          retention-days: 7
