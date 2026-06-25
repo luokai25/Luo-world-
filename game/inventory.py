@@ -6,7 +6,10 @@ Inventory System
 - Crafting recipe registry (expandable)
 """
 
-from ursina import *
+try:
+    from ursina import *
+except ImportError:
+    pass
 import json
 import os
 
