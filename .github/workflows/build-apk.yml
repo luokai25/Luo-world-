@@ -16,7 +16,6 @@ jobs:
     timeout-minutes: 120
 
     steps:
-      # ── MUST be first ──
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -42,148 +41,91 @@ jobs:
             libncurses5-dev libreadline-dev \
             libpng-dev libjpeg-dev \
             ccache automake autoconf \
-            cmake libtool pkg-config \
-            lld python3-dev \
-            openjdk-17-jdk-headless
+            cmake libtool pkg-config lld
 
       - name: Configure Android SDK
         run: |
-          # Accept all licenses
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          # Install exact versions needed
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
             "platform-tools" \
             "platforms;android-33" \
             "build-tools;33.0.2" \
             "ndk;25.2.9519653"
-          echo "NDK installed at: $ANDROID_HOME/ndk/25.2.9519653"
-          ls $ANDROID_HOME/ndk/
 
-      - name: Install Python build tools (pinned)
+      - name: Install Python build tools
         run: |
           pip install --upgrade pip
-          # These exact versions are known to work together
           pip install \
             "Cython==0.29.33" \
             "buildozer==1.5.0" \
             "python-for-android==2023.9.16" \
             "sh==1.14.3" \
             "appdirs==1.4.4" \
-            "colorama==0.4.6" \
-            "jinja2==3.1.2" \
-            "certifi"
+            "colorama==0.4.6"
 
-      - name: Verify tools
+      - name: Verify environment
         run: |
-          echo "=== Tool versions ==="
-          java -version
-          javac -version
-          python3 --version
-          cython --version
-          buildozer version
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "NDK: $(ls $ANDROID_HOME/ndk/)"
-          echo "=== buildozer.spec requirements ==="
-          grep "^requirements" buildozer.spec
+          echo "=== Java ===" && java -version && javac -version
+          echo "=== Python ===" && python3 --version
+          echo "=== Cython ===" && cython --version
+          echo "=== Buildozer ===" && buildozer version
+          echo "=== NDK ===" && ls $ANDROID_HOME/ndk/
+          echo "=== Build tools ===" && ls $ANDROID_HOME/build-tools/
+          echo "=== spec ===" && cat buildozer.spec
 
-      - name: Cache buildozer directory
+      - name: Cache buildozer
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.buildozer
-          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v7
-          restore-keys: |
-            buildozer-${{ runner.os }}-v7
+          path: ~/.buildozer
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v8
+          restore-keys: buildozer-${{ runner.os }}-v8
 
       - name: Build APK
+        id: build
         env:
           ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
-          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
-          # Tell buildozer not to download its own SDK/NDK
-          BUILDOZER_WARN_ON_ROOT: 0
+          JAVA_HOME: ${{ env.JAVA_HOME }}
         run: |
-          # Run buildozer — capture output AND preserve exit code
           set -o pipefail
-          yes | buildozer -v android debug 2>&1 | tee build.log
-          echo "Build exit code: ${PIPESTATUS[0]}"
-
-      - name: Find APK
-        id: find_apk
-        run: |
-          echo "=== Searching for APK ==="
-          find . -name "*.apk" 2>/dev/null | tee /tmp/apk_list.txt
-          APK=$(head -1 /tmp/apk_list.txt)
+          yes | buildozer -v android debug 2>&1 | tee build.log || true
+          echo "=== LAST 300 LINES OF BUILD LOG ===" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -300 build.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          # Now check if APK was produced
+          APK=$(find . -name "*.apk" | grep -v "\.buildozer/android/platform" | head -1)
           if [ -z "$APK" ]; then
-            echo "ERROR: No APK produced. Last 200 lines of build log:"
-            tail -200 build.log
+            APK=$(find .buildozer -name "*.apk" 2>/dev/null | head -1)
+          fi
+          if [ -z "$APK" ]; then
+            echo "BUILD FAILED - no APK found"
+            echo "=== FULL ERRORS ===" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep -i "error\|exception\|traceback\|failed" build.log | tail -50 >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
           echo "apk_path=$APK" >> $GITHUB_OUTPUT
-          echo "apk_name=$(basename $APK)" >> $GITHUB_OUTPUT
-          ls -lh "$APK"
+          echo "APK built: $APK"
 
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: LuoWorld-APK-build${{ github.run_number }}
-          path: ${{ steps.find_apk.outputs.apk_path }}
+          path: ${{ steps.build.outputs.apk_path }}
           retention-days: 30
 
-      - name: Create GitHub Release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v0.2.${{ github.run_number }}
           name: "🌿 Luo World v0.2.${{ github.run_number }}"
           body: |
             ## 🎮 Luo World APK — Build #${{ github.run_number }}
-
-            **APK:** `${{ steps.find_apk.outputs.apk_name }}`
-            **Commit:** `${{ github.sha }}`
-
-            ### 📱 Compatibility
-            | Android Version | API | Supported |
-            |-----------------|-----|-----------|
-            | Android 5.0 Lollipop | 21 | ✅ |
-            | Android 6.0 Marshmallow | 23 | ✅ |
-            | Android 7.0 Nougat | 24 | ✅ |
-            | Android 8.0 Oreo | 26 | ✅ |
-            | Android 9 Pie | 28 | ✅ |
-            | Android 10 | 29 | ✅ Poco X3 NFC |
-            | Android 11 | 30 | ✅ |
-            | Android 12 | 31 | ✅ |
-            | Android 13 | 33 | ✅ |
-            | ARM64 (64-bit) | | ✅ |
-            | ARM32 (32-bit) | | ✅ |
-
-            ### ⬇️ Install
-            1. Download `.apk` below
-            2. Settings → Security → **Install unknown apps → ON**
-            3. Tap APK → Install → **Play**
-
-            ### 🕹️ Controls
-            | Control | Action |
-            |---------|--------|
-            | Left joystick | Move |
-            | Right joystick | Camera |
-            | ⚔ | Attack / Chop / Hunt |
-            | E | Interact / Pick up / Fill cup / Refuel fire |
-            | USE | Eat / Drink |
-            | 🔥 | Place campfire (needs 3 logs+2 sticks+1 flint) |
-            | 🎒 | Inventory |
-            | ↑ | Jump |
-
-            ### 🌿 Features
-            - 512×512 open jungle world
-            - 5 biomes: dense jungle · rainforest · clearing · rocky hills · swamp
-            - 600 trees · 300 rocks · river + 8 ponds · 195 animals
-            - Campfire: place, cook raw meat, refuel
-            - Weather: 6 states (clear/cloudy/rain/storm/fog) + lightning
-            - Temperature system: hypothermia/overheating
-            - Full crafting UI (15+ recipes)
-            - 24-slot inventory with durability tracking
-            - Live minimap (tap to expand)
-          files: ${{ steps.find_apk.outputs.apk_path }}
+            **Target:** Android ARM64 + ARM32 · API 21-33 · Poco X3 NFC ✅
+            Download the APK below, enable unknown sources, install and play.
+          files: ${{ steps.build.outputs.apk_path }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload build log on failure
