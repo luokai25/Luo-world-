@@ -8,22 +8,19 @@ try:
 except ImportError:
     HAS_URSINA = False
 
-import math, random, numpy as np if False else None
-
 import math
 import random
 
 class World:
     def __init__(self, physics=None, seed=42):
-        self.physics  = physics
-        self.seed     = seed
-        self.rng      = random.Random(seed)
-        self.size     = 128
-        self.trees    = []
-        self.rocks    = []
-        self.foliage  = []
-        self._height_map = None
-
+        self.physics      = physics
+        self.seed         = seed
+        self.rng          = random.Random(seed)
+        self.size         = 128
+        self.trees        = []
+        self.rocks        = []
+        self.foliage      = []
+        self._height_map  = None
         if HAS_URSINA:
             self._generate()
 
@@ -37,12 +34,16 @@ class World:
         self._build_skybox()
 
     def _gen_heightmap(self):
+        try:
+            import numpy as np
+        except ImportError:
+            self._height_map = None
+            return
         size = self.size
-        import numpy as np
         hmap = np.zeros((size, size))
         for octave in range(5):
             freq = 0.02 * (2**octave)
-            amp  = 6.0 / (2**octave)
+            amp  = 6.0  / (2**octave)
             for x in range(size):
                 for z in range(size):
                     hmap[x][z] += (
@@ -59,7 +60,6 @@ class World:
 
     def _build_terrain(self):
         if not HAS_URSINA: return
-        # Simple flat plane for desktop
         Entity(model='plane', scale=self.size,
                color=color.rgb(45,100,35), collider='box')
         if self.physics:
@@ -76,13 +76,14 @@ class World:
         for _ in range(80):
             x = self.rng.uniform(-half+5, half-5)
             z = self.rng.uniform(-half+5, half-5)
-            if abs(x)<8 and abs(z)<8: continue
-            y = self.get_height(x,z)
-            h = self.rng.uniform(2,5)
+            if abs(x) < 8 and abs(z) < 8: continue
+            y = self.get_height(x, z)
+            h = self.rng.uniform(2, 5)
             t = Entity(model='cylinder', color=color.rgb(65,40,18),
                        scale=(0.2,h,0.2), position=(x,y+h/2,z), collider='box')
-            t.luo_type = 'tree'; t.health = 5
-            t.drops = [('wood_log', self.rng.randint(2,5))]
+            t.luo_type = 'tree'
+            t.health   = 5
+            t.drops    = [('wood_log', self.rng.randint(2,5))]
             self.trees.append(t)
             Entity(model='sphere', color=color.rgb(25,100,30),
                    scale=self.rng.uniform(1.5,3), position=(x,y+h,z))
@@ -93,13 +94,15 @@ class World:
         for _ in range(40):
             x = self.rng.uniform(-half+3, half-3)
             z = self.rng.uniform(-half+3, half-3)
-            if abs(x)<5 and abs(z)<5: continue
-            y = self.get_height(x,z)
-            s = self.rng.uniform(0.3,1.0)
+            if abs(x) < 5 and abs(z) < 5: continue
+            y = self.get_height(x, z)
+            s = self.rng.uniform(0.3, 1.0)
             r = Entity(model='sphere', color=color.rgb(110,110,100),
-                       scale=(s,s*0.65,s*0.9), position=(x,y+s*0.3,z), collider='sphere')
-            r.luo_type = 'rock'; r.health = 3
-            r.drops = [('stone', self.rng.randint(1,4))]
+                       scale=(s,s*0.65,s*0.9), position=(x,y+s*0.3,z),
+                       collider='sphere')
+            r.luo_type = 'rock'
+            r.health   = 3
+            r.drops    = [('stone', self.rng.randint(1,4))]
             self.rocks.append(r)
 
     def _build_skybox(self):
@@ -110,10 +113,8 @@ class World:
     def get_height(self, x, z):
         if self._height_map is None: return 0.0
         half = self.size//2
-        xi = int((x+half)/self.size*(self.size-1))
-        zi = int((z+half)/self.size*(self.size-1))
-        xi = max(0, min(self.size-1, xi))
-        zi = max(0, min(self.size-1, zi))
+        xi   = max(0, min(self.size-1, int((x+half)/self.size*(self.size-1))))
+        zi   = max(0, min(self.size-1, int((z+half)/self.size*(self.size-1))))
         return float(self._height_map[xi][zi])
 
     def update(self):
@@ -121,6 +122,7 @@ class World:
 
     def destroy_object(self, entity):
         drops = getattr(entity, 'drops', [])
-        pos   = entity.position if HAS_URSINA else (0,0,0)
-        if HAS_URSINA: destroy(entity)
+        pos   = (entity.position if HAS_URSINA else (0,0,0))
+        if HAS_URSINA:
+            destroy(entity)
         return drops, pos
