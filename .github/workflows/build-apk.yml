@@ -34,7 +34,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y \
-            git zip unzip \
+            git zip unzip ant \
             build-essential \
             libssl-dev libffi-dev \
             libsqlite3-dev zlib1g-dev \
@@ -55,59 +55,82 @@ jobs:
       - name: Install Python build tools
         run: |
           pip install --upgrade pip
+          # Install buildozer and pin sh BEFORE buildozer can change it
           pip install \
             "Cython==0.29.33" \
             "buildozer==1.5.0" \
-            "python-for-android==2023.9.16" \
             "sh==1.14.3" \
             "appdirs==1.4.4" \
             "colorama==0.4.6"
+          # Configure pip to allow system package breaks
+          # (needed because buildozer's bundled p4a runs pip internally)
+          pip config set global.break-system-packages true
+          # Pre-install p4a dependencies so buildozer's internal pip doesn't need to
+          pip install \
+            "python-for-android==2023.9.16" \
+            "jinja2" "meson" "ninja" "toml" "packaging" "wheel==0.43.0"
+          # Re-pin sh AFTER everything else installs
+          pip install "sh==1.14.3" --force-reinstall
 
-      - name: Verify environment
+      - name: Pre-configure buildozer cache
         run: |
-          echo "=== Java ===" && java -version && javac -version
-          echo "=== Python ===" && python3 --version
-          echo "=== Cython ===" && cython --version
-          echo "=== Buildozer ===" && buildozer version
-          echo "=== NDK ===" && ls $ANDROID_HOME/ndk/
-          echo "=== Build tools ===" && ls $ANDROID_HOME/build-tools/
-          echo "=== spec ===" && cat buildozer.spec
+          # Pre-link ant so buildozer doesn't try to download it
+          mkdir -p ~/.buildozer/android/platform
+          ln -sf /usr/share/ant ~/.buildozer/android/platform/apache-ant-1.9.4
+          # Tell buildozer where SDK/NDK are
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
+          # Pre-clone p4a so buildozer doesn't re-clone
+          if [ ! -d ~/.buildozer/android/platform/python-for-android ]; then
+            git clone --depth=1 -b 2023.09.16 \
+              https://github.com/kivy/python-for-android.git \
+              ~/.buildozer/android/platform/python-for-android || \
+            git clone --depth=1 \
+              https://github.com/kivy/python-for-android.git \
+              ~/.buildozer/android/platform/python-for-android
+          fi
 
       - name: Cache buildozer
         uses: actions/cache@v4
         with:
-          path: ~/.buildozer
-          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v8
-          restore-keys: buildozer-${{ runner.os }}-v8
+          path: |
+            ~/.buildozer
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v9
+          restore-keys: buildozer-${{ runner.os }}-v9
 
       - name: Build APK
-        id: build
         env:
           ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
           JAVA_HOME: ${{ env.JAVA_HOME }}
+          # Critical: allow pip to install system packages
+          PIP_BREAK_SYSTEM_PACKAGES: "1"
         run: |
           set -o pipefail
-          yes | buildozer -v android debug 2>&1 | tee build.log || true
-          echo "=== LAST 300 LINES OF BUILD LOG ===" >> $GITHUB_STEP_SUMMARY
+          yes | buildozer -v android debug 2>&1 | tee build.log || BUILD_FAILED=1
+
+          # Always write last 300 lines to step summary for debugging
+          echo '## Build Log (last 300 lines)' >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           tail -300 build.log >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          # Now check if APK was produced
-          APK=$(find . -name "*.apk" | grep -v "\.buildozer/android/platform" | head -1)
-          if [ -z "$APK" ]; then
-            APK=$(find .buildozer -name "*.apk" 2>/dev/null | head -1)
-          fi
-          if [ -z "$APK" ]; then
-            echo "BUILD FAILED - no APK found"
-            echo "=== FULL ERRORS ===" >> $GITHUB_STEP_SUMMARY
+
+          # Find APK
+          APK=$(find bin -name "*.apk" 2>/dev/null | head -1)
+          [ -z "$APK" ] && APK=$(find .buildozer -name "*.apk" 2>/dev/null | grep -v "unsigned" | head -1)
+
+          if [ -n "$APK" ]; then
+            echo "apk_path=$APK" >> $GITHUB_OUTPUT
+            echo "✅ APK found: $APK"
+          else
+            echo "❌ No APK found"
+            echo '## Errors' >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
-            grep -i "error\|exception\|traceback\|failed" build.log | tail -50 >> $GITHUB_STEP_SUMMARY
+            grep -iE "error:|traceback|exception|failed|sh: " build.log | tail -50 >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
-          echo "apk_path=$APK" >> $GITHUB_OUTPUT
-          echo "APK built: $APK"
+        id: build
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -123,8 +146,16 @@ jobs:
           name: "🌿 Luo World v0.2.${{ github.run_number }}"
           body: |
             ## 🎮 Luo World APK — Build #${{ github.run_number }}
-            **Target:** Android ARM64 + ARM32 · API 21-33 · Poco X3 NFC ✅
-            Download the APK below, enable unknown sources, install and play.
+            **Target:** Android ARM64 + ARM32 (API 21-33) · Poco X3 NFC ✅
+
+            ### ⬇️ Install
+            1. Download APK below
+            2. Settings → Security → Install unknown apps → ON
+            3. Tap APK → Install → Play
+
+            ### 🕹️ Controls
+            Left stick = Move · Right stick = Camera · ⚔ = Attack/Chop
+            E = Interact · USE = Eat/Drink · 🔥 = Place campfire · 🎒 = Inventory
           files: ${{ steps.build.outputs.apk_path }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
