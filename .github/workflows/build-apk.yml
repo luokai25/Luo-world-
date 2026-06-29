@@ -40,13 +40,6 @@ jobs:
             libreadline-dev libpng-dev libjpeg-dev \
             ccache automake autoconf cmake libtool pkg-config lld
 
-      - name: Configure Android SDK
-        run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
-            "platform-tools" "platforms;android-33" \
-            "build-tools;33.0.2" "ndk;25.2.9519653"
-
       - name: Install Python build tools
         run: |
           pip install --upgrade pip
@@ -55,24 +48,51 @@ jobs:
             "buildozer==1.5.0" \
             "sh==1.14.3" \
             "appdirs==1.4.4" \
-            "colorama==0.4.6"
-          pip config set global.break-system-packages true
-          pip install \
+            "colorama==0.4.6" \
             "python-for-android==2023.9.16" \
             "jinja2" "meson" "ninja" "toml" "packaging"
           pip install "sh==1.14.3" --force-reinstall
+          pip config set global.break-system-packages true
 
-      - name: Pre-link ant
+      - name: Pre-populate buildozer SDK/NDK paths
         run: |
+          # Buildozer ignores $ANDROID_HOME and looks in ~/.buildozer/
+          # Symlink the pre-installed SDK and NDK there so it never downloads
           mkdir -p ~/.buildozer/android/platform
+
+          # SDK symlink
+          ln -sf $ANDROID_HOME ~/.buildozer/android/platform/android-sdk
+
+          # NDK: pre-install r25c and symlink
+          # $ANDROID_HOME/ndk/25.2.9519653 is already installed by setup step below
+          # We'll do the SDK setup first, then symlink NDK after
+
+          # Ant symlink (so buildozer doesn't download it)
           ln -sf /usr/share/ant ~/.buildozer/android/platform/apache-ant-1.9.4
+
+          echo "=== Buildozer platform dir ==="
+          ls -la ~/.buildozer/android/platform/
+
+      - name: Configure Android SDK and NDK
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platform-tools" \
+            "platforms;android-33" \
+            "build-tools;33.0.2" \
+            "ndk;25.2.9519653"
+          echo "NDK installed at: $ANDROID_HOME/ndk/25.2.9519653"
+          # NOW symlink NDK using release name (25c) which buildozer expects
+          ln -sf $ANDROID_HOME/ndk/25.2.9519653 ~/.buildozer/android/platform/android-ndk-r25c
+          echo "=== NDK symlink ==="
+          ls -la ~/.buildozer/android/platform/android-ndk-r25c/
 
       - name: Cache buildozer
         uses: actions/cache@v4
         with:
           path: ~/.buildozer
-          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v10
-          restore-keys: buildozer-${{ runner.os }}-v10
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v11
+          restore-keys: buildozer-${{ runner.os }}-v11
 
       - name: Build APK
         id: build
@@ -82,33 +102,24 @@ jobs:
           JAVA_HOME: ${{ env.JAVA_HOME }}
           PIP_BREAK_SYSTEM_PACKAGES: "1"
         run: |
-          set -o pipefail
-          yes | buildozer -v android debug 2>&1 | tee build.log || true
-          
+          # NO "yes |" — it breaks urllib downloads with broken pipe
+          buildozer -v android debug 2>&1 | tee build.log
+          BUILD_EXIT=${PIPESTATUS[0]}
+
+          echo "=== Build exit: $BUILD_EXIT ==="
+          find bin -name "*.apk" 2>/dev/null || find .buildozer -name "*.apk" 2>/dev/null || echo "No APK found"
+
           APK=$(find bin -name "*.apk" 2>/dev/null | head -1)
-          [ -z "$APK" ] && APK=$(find .buildozer -name "*.apk" 2>/dev/null | grep -v "unsigned" | head -1)
-          
+          [ -z "$APK" ] && APK=$(find .buildozer -name "*.apk" 2>/dev/null | grep -v unsigned | head -1)
+
           if [ -n "$APK" ]; then
             echo "apk_path=$APK" >> $GITHUB_OUTPUT
-            echo "APK_FOUND=true" >> $GITHUB_ENV
           else
-            echo "APK_FOUND=false" >> $GITHUB_ENV
-            # Push log to gist so we can read it
-            LOG_CONTENT=$(tail -200 build.log | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))")
-            curl -s -X POST \
-              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              -H "Content-Type: application/json" \
-              "https://api.github.com/gists" \
-              -d "{\"description\":\"Luo World build log #${{ github.run_number }}\",\"public\":true,\"files\":{\"build-log.txt\":{\"content\":$LOG_CONTENT}}}" \
-              > /tmp/gist_response.json
-            GIST_URL=$(python3 -c "import json; print(json.load(open('/tmp/gist_response.json')).get('html_url','failed'))")
-            echo "GIST_URL=$GIST_URL" >> $GITHUB_ENV
-            echo "Build log gist: $GIST_URL"
+            tail -100 build.log
             exit 1
           fi
 
-      - name: Upload APK
-        if: env.APK_FOUND == 'true'
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: LuoWorld-APK-build${{ github.run_number }}
@@ -116,7 +127,6 @@ jobs:
           retention-days: 30
 
       - name: Create Release
-        if: env.APK_FOUND == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v0.2.${{ github.run_number }}
@@ -124,7 +134,11 @@ jobs:
           body: |
             ## 🎮 Luo World APK — Build #${{ github.run_number }}
             **Target:** Android ARM64 + ARM32 (API 21-33) · Poco X3 NFC ✅
-            Download APK below → Enable unknown sources → Install → Play
+
+            ### Install
+            1. Download APK below
+            2. Settings → Security → Install unknown apps → ON
+            3. Tap APK → Install → Play
           files: ${{ steps.build.outputs.apk_path }}
           token: ${{ secrets.GITHUB_TOKEN }}
 

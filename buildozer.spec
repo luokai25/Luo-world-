@@ -22,7 +22,7 @@ fullscreen = 1
 # Android SDK/NDK — match what CI runner has
 android.api = 33
 android.minapi = 21
-android.ndk = 25.2.9519653
+android.ndk = 25c
 android.ndk_api = 21
 android.build_tools_version = 33.0.2
 
