@@ -7,71 +7,93 @@ on:
 
 permissions:
   contents: write
-  actions: read
 
 jobs:
   build-apk:
     name: Build Android APK
     runs-on: ubuntu-22.04
-    # Use the official Kivy buildozer Docker image
-    # Same approach as barichello/godot-ci - everything pre-installed
     container:
-      image: kivy/buildozer:latest
+      image: barichello/godot-ci:3.2.3
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Android export templates
+        run: |
+          mkdir -p /root/.local/share/godot/templates
+          mv /root/godot/templates/3.2.3.stable /root/.local/share/godot/templates/3.2.3.stable
+
+      - name: Configure editor settings
+        run: |
+          mkdir -p /root/.config/godot
+          cat > /root/.config/godot/editor_settings-3.tres << 'EOF'
+[gd_resource type="EditorSettings" format=2]
+[resource]
+export/android/android_sdk_path = "/root/android-sdk"
+export/android/debug_keystore = "/root/debug.keystore"
+export/android/debug_keystore_user = "androiddebugkey"
+export/android/debug_keystore_pass = "android"
+export/android/force_system_user = false
+export/android/shutdown_adb_on_exit = true
+export/android/timestamped_builds = false
+EOF
 
       - name: Build APK
         run: |
-          buildozer -v android debug 2>&1 | tee build.log
-          echo "=== APK search ==="
-          find . -name "*.apk" 2>/dev/null
+          mkdir -p build/android
+          godot --no-window --export-debug "Android" build/android/LuoWorld.apk
 
-      - name: Find APK path
-        id: find_apk
+      - name: Verify APK
         run: |
-          APK=$(find bin -name "*.apk" 2>/dev/null | head -1)
-          [ -z "$APK" ] && APK=$(find .buildozer -name "*.apk" 2>/dev/null | grep -v unsigned | head -1)
-          if [ -z "$APK" ]; then
-            echo "ERROR: No APK found"
-            tail -80 build.log
+          ls -lh build/android/
+          APK=build/android/LuoWorld.apk
+          if [ ! -f "$APK" ]; then
+            echo "ERROR: APK not found"
             exit 1
           fi
-          echo "apk_path=$APK" >> $GITHUB_OUTPUT
-          echo "Found: $APK"
+          echo "APK size: $(du -sh $APK | cut -f1)"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: LuoWorld-APK-build${{ github.run_number }}
-          path: ${{ steps.find_apk.outputs.apk_path }}
+          path: build/android/LuoWorld.apk
           retention-days: 30
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.2.${{ github.run_number }}
-          name: "🌿 Luo World v0.2.${{ github.run_number }}"
+          tag_name: v1.0.${{ github.run_number }}
+          name: "🌿 Luo World v1.0.${{ github.run_number }}"
           body: |
-            ## 🎮 Luo World APK — Build #${{ github.run_number }}
-            **Target:** Android ARM64 + ARM32 · API 21-33 · Poco X3 NFC ✅
+            ## 🎮 Luo World — Build #${{ github.run_number }}
 
-            ### Install
-            1. Download APK below
-            2. Settings → Security → Install unknown apps → ON
+            **Engine:** Godot 3.2.3
+            **Target:** Android ARM64 + ARM32 · API 21+ · Poco X3 NFC ✅
+
+            ### ⬇️ Install
+            1. Download `LuoWorld.apk` below
+            2. Settings → Security → Install unknown apps → **ON**
             3. Tap APK → Install → Play
 
-            ### Controls
-            Left stick = Move · Right stick = Camera · ⚔ = Attack/Chop
-            E = Interact · USE = Eat/Drink · 🔥 = Campfire · 🎒 = Inventory
-          files: ${{ steps.find_apk.outputs.apk_path }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+            ### 🕹️ Controls (Android touch)
+            | | |
+            |---|---|
+            | Left joystick | Move |
+            | Right joystick | Camera |
+            | ⚔ button | Attack / Chop / Hunt |
+            | E button | Interact / Pick up / Fill cup |
+            | USE button | Eat / Drink |
+            | 🎒 button | Inventory |
+            | ↑ button | Jump |
 
-      - name: Upload build log on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log-${{ github.run_number }}
-          path: build.log
-          retention-days: 7
+            ### 🌿 World
+            - 512×512 photorealistic jungle
+            - 600 trees · 300 rocks · river + 8 ponds
+            - 195 animals (deer, boar, rabbit, bird)
+            - 5 biomes · weather system · day/night
+            - Full crafting: 15+ recipes
+            - Starting items: stone axe + 3x cooked meat + wooden cup
+          files: build/android/LuoWorld.apk
+          token: ${{ secrets.GITHUB_TOKEN }}

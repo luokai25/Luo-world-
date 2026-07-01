@@ -1,6 +1,5 @@
-__pycache__/
-*.pyc
-*.pyo
-.DS_Store
-data/saves/
 .buildozer/
+*.pyc
+__pycache__/
+data/saves/
+android.keystore
