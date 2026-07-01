@@ -1,58 +1,56 @@
 name: Build Luo World APK
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
+  push:
+    branches: [main]
 
 permissions:
   contents: write
 
 jobs:
-  build-apk:
-    name: Build Android APK
-    runs-on: ubuntu-22.04
+  build:
+    runs-on: ubuntu-24.04
     container:
       image: barichello/godot-ci:3.2.3
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
 
-      - name: Setup Android export templates
+      - name: Install tools
         run: |
-          mkdir -p /root/.local/share/godot/templates
-          mv /root/godot/templates/3.2.3.stable /root/.local/share/godot/templates/3.2.3.stable
+          apt-get update
+          apt-get install -y curl unzip
+
+      - name: Download Android export templates
+        run: |
+          mkdir -p ~/.local/share/godot/templates/3.2.3.stable
+          curl -L -o /tmp/export_templates.zip "https://github.com/godotengine/godot/releases/download/3.2.3-stable/Godot_v3.2.3-stable_export_templates.tpz"
+          unzip /tmp/export_templates.zip -d /tmp/godot_templates
+          cp /tmp/godot_templates/templates/*.apk ~/.local/share/godot/templates/3.2.3.stable/
+          ls -la ~/.local/share/godot/templates/3.2.3.stable/
 
       - name: Configure editor settings
         run: |
-          mkdir -p /root/.config/godot
-          cat > /root/.config/godot/editor_settings-3.tres << 'EOF'
-[gd_resource type="EditorSettings" format=2]
-[resource]
-export/android/android_sdk_path = "/root/android-sdk"
-export/android/debug_keystore = "/root/debug.keystore"
-export/android/debug_keystore_user = "androiddebugkey"
-export/android/debug_keystore_pass = "android"
-export/android/force_system_user = false
-export/android/shutdown_adb_on_exit = true
-export/android/timestamped_builds = false
-EOF
+          mkdir -p ~/.config/godot
+          cat > ~/.config/godot/editor_settings-3.tres << 'EOF'
+          [gd_resource type="EditorSettings" format=2]
 
-      - name: Build APK
+          [resource]
+          export/android/adb = "/usr/bin/adb"
+          export/android/jarsigner = "/usr/bin/jarsigner"
+          export/android/debug_keystore = "/root/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          export/android/java_sdk_path = "/usr/lib/jvm/java-17-openjdk-amd64"
+          export/android/android_sdk_path = "/usr/lib/android-sdk"
+          EOF
+
+      - name: Build Android APK
         run: |
           mkdir -p build/android
-          godot --no-window --export-debug "Android" build/android/LuoWorld.apk
-
-      - name: Verify APK
-        run: |
-          ls -lh build/android/
-          APK=build/android/LuoWorld.apk
-          if [ ! -f "$APK" ]; then
-            echo "ERROR: APK not found"
-            exit 1
-          fi
-          echo "APK size: $(du -sh $APK | cut -f1)"
+          godot --headless --verbose --export-debug "Android" "build/android/LuoWorld.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -67,33 +65,16 @@ EOF
           tag_name: v1.0.${{ github.run_number }}
           name: "🌿 Luo World v1.0.${{ github.run_number }}"
           body: |
-            ## 🎮 Luo World — Build #${{ github.run_number }}
-
-            **Engine:** Godot 3.2.3
-            **Target:** Android ARM64 + ARM32 · API 21+ · Poco X3 NFC ✅
+            ## 🎮 Luo World APK — Build #${{ github.run_number }}
+            **Engine:** Godot 3.2.3 · **Target:** Android ARM64+ARM32 · Poco X3 NFC ✅
 
             ### ⬇️ Install
             1. Download `LuoWorld.apk` below
-            2. Settings → Security → Install unknown apps → **ON**
+            2. Settings → Security → Install unknown apps → ON
             3. Tap APK → Install → Play
 
-            ### 🕹️ Controls (Android touch)
-            | | |
-            |---|---|
-            | Left joystick | Move |
-            | Right joystick | Camera |
-            | ⚔ button | Attack / Chop / Hunt |
-            | E button | Interact / Pick up / Fill cup |
-            | USE button | Eat / Drink |
-            | 🎒 button | Inventory |
-            | ↑ button | Jump |
-
-            ### 🌿 World
-            - 512×512 photorealistic jungle
-            - 600 trees · 300 rocks · river + 8 ponds
-            - 195 animals (deer, boar, rabbit, bird)
-            - 5 biomes · weather system · day/night
-            - Full crafting: 15+ recipes
-            - Starting items: stone axe + 3x cooked meat + wooden cup
+            ### 🕹️ Controls
+            Left stick = Move · Right stick = Camera
+            ⚔ = Attack/Chop · E = Interact · USE = Eat/Drink · 🎒 = Inventory
           files: build/android/LuoWorld.apk
           token: ${{ secrets.GITHUB_TOKEN }}
