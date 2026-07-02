@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=2]
+[gd_scene load_steps=6 format=2]
 
 [ext_resource path="res://scripts/Main.gd" type="Script" id=1]
 [ext_resource path="res://scripts/World.gd" type="Script" id=2]
@@ -7,10 +7,15 @@
 
 [sub_resource type="CapsuleShape" id=1]
 radius = 0.35
-height = 1.4
+height = 1.2
 
-[sub_resource type="SphereShape" id=2]
-radius = 0.18
+[sub_resource type="CapsuleMesh" id=2]
+radius = 0.32
+mid_height = 0.9
+
+[sub_resource type="SpatialMaterial" id=3]
+albedo_color = Color( 0.35, 0.42, 0.30, 1 )
+roughness = 0.85
 
 [node name="Main" type="Spatial"]
 script = ExtResource( 1 )
@@ -19,260 +24,279 @@ script = ExtResource( 1 )
 script = ExtResource( 2 )
 
 [node name="Player" type="KinematicBody" parent="."]
-transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0 )
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0 )
+collision_layer = 2
+collision_mask = 1
 script = ExtResource( 3 )
 
 [node name="CollisionShape" type="CollisionShape" parent="Player"]
 shape = SubResource( 1 )
 
+[node name="Body" type="MeshInstance" parent="Player"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0 )
+mesh = SubResource( 2 )
+material/0 = SubResource( 3 )
+
 [node name="CameraPivot" type="Spatial" parent="Player"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 4.5 )
 
 [node name="Camera" type="Camera" parent="Player/CameraPivot"]
-transform = Transform( 1, 0, 0, 0, 0.966, 0.259, 0, -0.259, 0.966, 0, 2, 4.5 )
-fov = 70.0
-
-[node name="BodyMesh" type="MeshInstance" parent="Player"]
-transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0 )
-mesh = SubResource( 2 )
+fov = 68.0
+near = 0.1
+far = 400.0
 
 [node name="HUD" type="CanvasLayer" parent="."]
 script = ExtResource( 4 )
 
-[node name="StatBars" type="Control" parent="HUD"]
+[node name="Top" type="Control" parent="HUD"]
 anchor_right = 1.0
-anchor_bottom = 1.0
+mouse_filter = 2
 
-[node name="HealthBar" type="ProgressBar" parent="HUD/StatBars"]
-anchor_right = 0.0
-margin_left = 10
-margin_top = 10
-margin_right = 210
-margin_bottom = 28
-min_value = 0.0
-max_value = 100.0
-value = 100.0
-
-[node name="HungerBar" type="ProgressBar" parent="HUD/StatBars"]
-margin_left = 10
-margin_top = 34
-margin_right = 210
-margin_bottom = 52
-min_value = 0.0
-max_value = 100.0
-value = 100.0
-modulate = Color( 1, 0.6, 0.1, 1 )
-
-[node name="ThirstBar" type="ProgressBar" parent="HUD/StatBars"]
-margin_left = 10
-margin_top = 58
-margin_right = 210
-margin_bottom = 76
-min_value = 0.0
-max_value = 100.0
-value = 100.0
-modulate = Color( 0.2, 0.5, 1, 1 )
-
-[node name="StaminaBar" type="ProgressBar" parent="HUD/StatBars"]
-margin_left = 10
-margin_top = 82
-margin_right = 210
-margin_bottom = 100
-min_value = 0.0
-max_value = 100.0
-value = 100.0
-modulate = Color( 0.6, 1, 0.2, 1 )
-
-[node name="NotifLabel" type="Label" parent="HUD"]
+[node name="Notif" type="Label" parent="HUD/Top"]
 anchor_left = 0.5
 anchor_right = 0.5
-margin_left = -200
-margin_top = 20
-margin_right = 200
-margin_bottom = 50
-align = 1
-custom_colors/font_color = Color( 1, 1, 0.8, 1 )
-text = ""
-
-[node name="PromptLabel" type="Label" parent="HUD"]
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
 margin_left = -220
-margin_top = -20
+margin_top = 16
 margin_right = 220
-margin_bottom = 20
+margin_bottom = 46
 align = 1
-custom_colors/font_color = Color( 1, 1, 1, 0.9 )
 text = ""
 
-[node name="TimeLabel" type="Label" parent="HUD"]
+[node name="Time" type="Label" parent="HUD/Top"]
 anchor_left = 1.0
 anchor_right = 1.0
-margin_left = -200
-margin_top = 10
-margin_right = -10
-margin_bottom = 35
+margin_left = -220
+margin_top = 12
+margin_right = -12
+margin_bottom = 36
 align = 2
-custom_colors/font_color = Color( 1, 0.95, 0.7, 1 )
 text = "Day 1  10:00 ☀️"
 
-[node name="WeatherLabel" type="Label" parent="HUD"]
-anchor_left = 1.0
+[node name="Center" type="Control" parent="HUD"]
 anchor_right = 1.0
-margin_left = -200
-margin_top = 38
-margin_right = -10
-margin_bottom = 58
-align = 2
-custom_colors/font_color = Color( 0.8, 0.9, 1, 1 )
-text = "☀️ Clear"
+anchor_bottom = 1.0
+mouse_filter = 2
 
-[node name="Hotbar" type="HBoxContainer" parent="HUD"]
+[node name="Prompt" type="Label" parent="HUD/Center"]
+anchor_left = 0.5
+anchor_top = 0.55
+anchor_right = 0.5
+anchor_bottom = 0.55
+margin_left = -220
+margin_top = -18
+margin_right = 220
+margin_bottom = 18
+align = 1
+text = ""
+
+[node name="Bottom" type="Control" parent="HUD"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Stats" type="VBoxContainer" parent="HUD/Bottom"]
+margin_left = 14
+margin_top = 14
+margin_right = 214
+margin_bottom = 110
+custom_constants/separation = 4
+
+[node name="HealthBar" type="ProgressBar" parent="HUD/Bottom/Stats"]
+margin_right = 200
+margin_bottom = 20
+min_value = 0.0
+max_value = 100.0
+value = 100.0
+
+[node name="HungerBar" type="ProgressBar" parent="HUD/Bottom/Stats"]
+margin_top = 24
+margin_right = 200
+margin_bottom = 44
+min_value = 0.0
+max_value = 100.0
+value = 100.0
+
+[node name="ThirstBar" type="ProgressBar" parent="HUD/Bottom/Stats"]
+margin_top = 48
+margin_right = 200
+margin_bottom = 68
+min_value = 0.0
+max_value = 100.0
+value = 100.0
+
+[node name="StaminaBar" type="ProgressBar" parent="HUD/Bottom/Stats"]
+margin_top = 72
+margin_right = 200
+margin_bottom = 92
+min_value = 0.0
+max_value = 100.0
+value = 100.0
+
+[node name="Hotbar" type="HBoxContainer" parent="HUD/Bottom"]
 anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-margin_left = -280
-margin_top = -80
-margin_right = 280
-margin_bottom = -10
+margin_left = -256
+margin_top = -78
+margin_right = 256
+margin_bottom = -14
 custom_constants/separation = 4
 
-[node name="Slot0" type="PanelContainer" parent="HUD/Hotbar"]
-custom_minimum_size = Vector2( 64, 64 )
+[node name="Slot0" type="PanelContainer" parent="HUD/Bottom/Hotbar"]
+margin_right = 60
+margin_bottom = 60
+rect_min_size = Vector2( 60, 60 )
 
-[node name="Icon" type="Label" parent="HUD/Hotbar/Slot0"]
+[node name="Icon" type="Label" parent="HUD/Bottom/Hotbar/Slot0"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 align = 1
 valign = 1
 text = "🪓"
 
-[node name="Slot1" type="PanelContainer" parent="HUD/Hotbar"]
-custom_minimum_size = Vector2( 64, 64 )
+[node name="Slot1" type="PanelContainer" parent="HUD/Bottom/Hotbar"]
+margin_left = 64
+margin_right = 124
+margin_bottom = 60
+rect_min_size = Vector2( 60, 60 )
 
-[node name="Icon" type="Label" parent="HUD/Hotbar/Slot1"]
+[node name="Icon" type="Label" parent="HUD/Bottom/Hotbar/Slot1"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 align = 1
 valign = 1
 text = "🥩"
 
-[node name="Slot2" type="PanelContainer" parent="HUD/Hotbar"]
-custom_minimum_size = Vector2( 64, 64 )
+[node name="Slot2" type="PanelContainer" parent="HUD/Bottom/Hotbar"]
+margin_left = 128
+margin_right = 188
+margin_bottom = 60
+rect_min_size = Vector2( 60, 60 )
 
-[node name="Icon" type="Label" parent="HUD/Hotbar/Slot2"]
+[node name="Icon" type="Label" parent="HUD/Bottom/Hotbar/Slot2"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 align = 1
 valign = 1
 text = "🥤"
 
-[node name="Slot3" type="PanelContainer" parent="HUD/Hotbar"]
-custom_minimum_size = Vector2( 64, 64 )
+[node name="Slot3" type="PanelContainer" parent="HUD/Bottom/Hotbar"]
+margin_left = 192
+margin_right = 252
+margin_bottom = 60
+rect_min_size = Vector2( 60, 60 )
 
-[node name="Icon" type="Label" parent="HUD/Hotbar/Slot3"]
+[node name="Icon" type="Label" parent="HUD/Bottom/Hotbar/Slot3"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 align = 1
 valign = 1
 text = ""
 
-[node name="Slot4" type="PanelContainer" parent="HUD/Hotbar"]
-custom_minimum_size = Vector2( 64, 64 )
+[node name="Slot4" type="PanelContainer" parent="HUD/Bottom/Hotbar"]
+margin_left = 256
+margin_right = 316
+margin_bottom = 60
+rect_min_size = Vector2( 60, 60 )
 
-[node name="Icon" type="Label" parent="HUD/Hotbar/Slot4"]
+[node name="Icon" type="Label" parent="HUD/Bottom/Hotbar/Slot4"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 align = 1
 valign = 1
 text = ""
 
-[node name="Slot5" type="PanelContainer" parent="HUD/Hotbar"]
-custom_minimum_size = Vector2( 64, 64 )
+[node name="Slot5" type="PanelContainer" parent="HUD/Bottom/Hotbar"]
+margin_left = 320
+margin_right = 380
+margin_bottom = 60
+rect_min_size = Vector2( 60, 60 )
 
-[node name="Icon" type="Label" parent="HUD/Hotbar/Slot5"]
+[node name="Icon" type="Label" parent="HUD/Bottom/Hotbar/Slot5"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 align = 1
 valign = 1
 text = ""
 
-[node name="Slot6" type="PanelContainer" parent="HUD/Hotbar"]
-custom_minimum_size = Vector2( 64, 64 )
+[node name="Slot6" type="PanelContainer" parent="HUD/Bottom/Hotbar"]
+margin_left = 384
+margin_right = 444
+margin_bottom = 60
+rect_min_size = Vector2( 60, 60 )
 
-[node name="Icon" type="Label" parent="HUD/Hotbar/Slot6"]
+[node name="Icon" type="Label" parent="HUD/Bottom/Hotbar/Slot6"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 align = 1
 valign = 1
 text = ""
 
-[node name="Slot7" type="PanelContainer" parent="HUD/Hotbar"]
-custom_minimum_size = Vector2( 64, 64 )
+[node name="Slot7" type="PanelContainer" parent="HUD/Bottom/Hotbar"]
+margin_left = 448
+margin_right = 508
+margin_bottom = 60
+rect_min_size = Vector2( 60, 60 )
 
-[node name="Icon" type="Label" parent="HUD/Hotbar/Slot7"]
+[node name="Icon" type="Label" parent="HUD/Bottom/Hotbar/Slot7"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 align = 1
 valign = 1
 text = ""
 
-[node name="ActionButtons" type="Control" parent="HUD"]
-anchor_right = 1.0
-anchor_bottom = 1.0
-
-[node name="AttackBtn" type="Button" parent="HUD/ActionButtons"]
+[node name="Actions" type="Control" parent="HUD/Bottom"]
 anchor_left = 1.0
-anchor_right = 1.0
 anchor_top = 1.0
+anchor_right = 1.0
 anchor_bottom = 1.0
-margin_left = -310
-margin_top = -170
-margin_right = -224
-margin_bottom = -84
+margin_left = -440
+margin_top = -340
+margin_right = -14
+margin_bottom = -14
+mouse_filter = 2
+
+[node name="AttackBtn" type="Button" parent="HUD/Bottom/Actions"]
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = -170
+margin_top = -156
+margin_right = -84
+margin_bottom = -70
 text = "⚔"
 
-[node name="InteractBtn" type="Button" parent="HUD/ActionButtons"]
+[node name="InteractBtn" type="Button" parent="HUD/Bottom/Actions"]
 anchor_left = 1.0
-anchor_right = 1.0
 anchor_top = 1.0
+anchor_right = 1.0
 anchor_bottom = 1.0
-margin_left = -210
-margin_top = -230
-margin_right = -124
-margin_bottom = -144
+margin_left = -84
+margin_top = -216
+margin_right = 0
+margin_bottom = -130
 text = "E"
 
-[node name="UseBtn" type="Button" parent="HUD/ActionButtons"]
+[node name="UseBtn" type="Button" parent="HUD/Bottom/Actions"]
 anchor_left = 1.0
-anchor_right = 1.0
 anchor_top = 1.0
+anchor_right = 1.0
 anchor_bottom = 1.0
-margin_left = -420
-margin_top = -170
-margin_right = -334
-margin_bottom = -84
+margin_left = -280
+margin_top = -156
+margin_right = -194
+margin_bottom = -70
 text = "USE"
 
-[node name="JumpBtn" type="Button" parent="HUD/ActionButtons"]
+[node name="JumpBtn" type="Button" parent="HUD/Bottom/Actions"]
 anchor_left = 1.0
-anchor_right = 1.0
 anchor_top = 1.0
-anchor_bottom = 1.0
-margin_left = -210
-margin_top = -330
-margin_right = -124
-margin_bottom = -244
-text = "↑"
-
-[node name="InventoryBtn" type="Button" parent="HUD/ActionButtons"]
-anchor_left = 1.0
 anchor_right = 1.0
-anchor_top = 0.0
-margin_left = -100
-margin_top = 10
-margin_right = -10
-margin_bottom = 70
-text = "🎒"
+anchor_bottom = 1.0
+margin_left = -84
+margin_top = -320
+margin_right = 0
+margin_bottom = -234
+text = "↑"

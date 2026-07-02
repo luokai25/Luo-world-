@@ -3,3 +3,6 @@
 __pycache__/
 data/saves/
 android.keystore
+.import/
+export.cfg
+export_credentials.cfg

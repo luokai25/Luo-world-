@@ -1,108 +1,105 @@
 extends CanvasLayer
-# HUD - stat bars, hotbar, crosshair, touch controls, notifications
-
-onready var health_bar  = $StatBars/HealthBar
-onready var hunger_bar  = $StatBars/HungerBar
-onready var thirst_bar  = $StatBars/ThirstBar
-onready var stamina_bar = $StatBars/StaminaBar
-onready var notif_label = $NotifLabel
-onready var prompt_label= $PromptLabel
-onready var time_label  = $TimeLabel
-onready var weather_label = $WeatherLabel
 
 # Touch joystick state
-var joy_move: Vector2 = Vector2.ZERO
-var joy_cam:  Vector2 = Vector2.ZERO
-var joy_move_center: Vector2
-var joy_cam_center:  Vector2
-var joy_move_touch:  int = -1
-var joy_cam_touch:   int = -1
-const JOY_RADIUS: float = 120.0
+var joy_move: Vector2        = Vector2.ZERO
+var joy_cam:  Vector2        = Vector2.ZERO
+var _joy_move_center: Vector2
+var _joy_cam_center:  Vector2
+var _joy_move_id: int        = -1
+var _joy_cam_id:  int        = -1
+const JOY_R: float           = 110.0
+
+# Stat bar nodes
+onready var health_bar   = $Bottom/Stats/HealthBar
+onready var hunger_bar   = $Bottom/Stats/HungerBar
+onready var thirst_bar   = $Bottom/Stats/ThirstBar
+onready var stamina_bar  = $Bottom/Stats/StaminaBar
+onready var notif_label  = $Top/Notif
+onready var prompt_label = $Center/Prompt
+onready var time_label   = $Top/Time
 
 func _ready():
-	GameState.connect("stats_changed", self, "_update_bars")
-	GameState.connect("inventory_changed", self, "_update_hotbar")
 	var vp = get_viewport().size
-	joy_move_center = Vector2(150, vp.y - 150)
-	joy_cam_center  = Vector2(vp.x - 150, vp.y - 150)
-	_update_hotbar()
+	_joy_move_center = Vector2(140, vp.y - 140)
+	_joy_cam_center  = Vector2(vp.x - 140, vp.y - 140)
+	GameState.connect("stats_changed",    self, "_refresh_stats")
+	GameState.connect("inventory_changed",self, "_refresh_hotbar")
+	_refresh_hotbar()
+	# Joystick visuals need a Control node (CanvasLayer can't draw directly)
+	_joy_draw = Control.new()
+	_joy_draw.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_joy_draw.set_anchors_and_margins_preset(Control.PRESET_WIDE)
+	_joy_draw.connect("draw", self, "_draw_joysticks")
+	add_child(_joy_draw)
 
-func _update_bars():
-	health_bar.value  = GameState.health  / GameState.max_health  * 100.0
-	hunger_bar.value  = GameState.hunger  / GameState.max_hunger  * 100.0
-	thirst_bar.value  = GameState.thirst  / GameState.max_thirst  * 100.0
-	stamina_bar.value = GameState.stamina / GameState.max_stamina * 100.0
+var _joy_draw: Control
+
+func _process(_delta):
 	notif_label.text  = GameState.get_current_notification()
 	time_label.text   = GameState.get_time_str()
+	if health_bar:
+		health_bar.value  = GameState.health  / GameState.max_health  * 100.0
+		hunger_bar.value  = GameState.hunger  / GameState.max_hunger  * 100.0
+		thirst_bar.value  = GameState.thirst  / GameState.max_thirst  * 100.0
+		stamina_bar.value = GameState.stamina / GameState.max_stamina * 100.0
 
-func _update_hotbar():
+func _refresh_stats():
+	pass  # handled in _process
+
+func _refresh_hotbar():
 	for i in range(8):
-		var slot_node = get_node_or_null("Hotbar/Slot%d" % i)
-		if slot_node == null:
-			continue
+		var slot_node = get_node_or_null("Bottom/Hotbar/Slot%d/Icon" % i)
+		if slot_node == null: continue
 		var slot = GameState.slots[i]
-		var icon_node = slot_node.get_node_or_null("Icon")
-		if icon_node == null:
-			continue
 		if slot.item_id != "":
 			var data = Items.get_item(slot.item_id)
-			icon_node.text = data.get("icon", "?")
+			slot_node.text = data.get("icon","?")
 			if slot.count > 1:
-				icon_node.text += "\n" + str(slot.count)
+				slot_node.text += "\n" + str(slot.count)
 		else:
-			icon_node.text = ""
+			slot_node.text = ""
 
 func set_prompt(text: String):
-	prompt_label.text = text
+	if prompt_label: prompt_label.text = text
 
-func set_weather(text: String):
-	weather_label.text = text
-
-# ── TOUCH INPUT ───────────────────────────────
+# ── TOUCH ─────────────────────────────────────
 func _input(event):
 	if event is InputEventScreenTouch:
-		_handle_touch(event)
+		_on_touch(event)
 	elif event is InputEventScreenDrag:
-		_handle_drag(event)
+		_on_drag(event)
 
-func _handle_touch(event: InputEventScreenTouch):
+func _on_touch(event: InputEventScreenTouch):
 	var pos = event.position
+	var vp  = get_viewport().size
 	if event.pressed:
-		# Left zone = move joystick
-		if pos.x < get_viewport().size.x * 0.4:
-			joy_move_touch  = event.index
-			joy_move_center = pos
-			joy_move        = Vector2.ZERO
-		# Right zone = camera joystick
-		elif pos.x > get_viewport().size.x * 0.6:
-			joy_cam_touch   = event.index
-			joy_cam_center  = pos
-			joy_cam         = Vector2.ZERO
+		if pos.x < vp.x * 0.38:
+			_joy_move_id     = event.index
+			_joy_move_center = pos
+			joy_move         = Vector2.ZERO
+		elif pos.x > vp.x * 0.62:
+			_joy_cam_id      = event.index
+			_joy_cam_center  = pos
+			joy_cam          = Vector2.ZERO
 	else:
-		if event.index == joy_move_touch:
-			joy_move_touch = -1
-			joy_move = Vector2.ZERO
-		if event.index == joy_cam_touch:
-			joy_cam_touch = -1
-			joy_cam = Vector2.ZERO
+		if event.index == _joy_move_id: _joy_move_id = -1; joy_move = Vector2.ZERO
+		if event.index == _joy_cam_id:  _joy_cam_id  = -1; joy_cam  = Vector2.ZERO
 
-func _handle_drag(event: InputEventScreenDrag):
-	if event.index == joy_move_touch:
-		var delta = event.position - joy_move_center
-		if delta.length() > JOY_RADIUS:
-			delta = delta.normalized() * JOY_RADIUS
-		joy_move = delta / JOY_RADIUS
-	if event.index == joy_cam_touch:
-		var delta = event.position - joy_cam_center
-		if delta.length() > JOY_RADIUS:
-			delta = delta.normalized() * JOY_RADIUS
-		joy_cam = delta / JOY_RADIUS
+func _on_drag(event: InputEventScreenDrag):
+	if event.index == _joy_move_id:
+		var d = event.position - _joy_move_center
+		if d.length() > JOY_R: d = d.normalized() * JOY_R
+		joy_move = d / JOY_R
+	if event.index == _joy_cam_id:
+		var d = event.position - _joy_cam_center
+		if d.length() > JOY_R: d = d.normalized() * JOY_R
+		joy_cam  = d / JOY_R
+	if _joy_draw: _joy_draw.update()
 
-func _draw():
-	# Draw joystick circles
-	if joy_move_touch >= 0:
-		draw_circle(joy_move_center, JOY_RADIUS, Color(1, 1, 1, 0.15))
-		draw_circle(joy_move_center + joy_move * JOY_RADIUS, 40, Color(1, 1, 1, 0.4))
-	if joy_cam_touch >= 0:
-		draw_circle(joy_cam_center, JOY_RADIUS, Color(1, 1, 1, 0.15))
-		draw_circle(joy_cam_center + joy_cam * JOY_RADIUS, 40, Color(1, 1, 1, 0.4))
+func _draw_joysticks():
+	if _joy_move_id >= 0:
+		_joy_draw.draw_circle(_joy_move_center, JOY_R, Color(1,1,1,0.12))
+		_joy_draw.draw_circle(_joy_move_center + joy_move * JOY_R, 36, Color(1,1,1,0.40))
+	if _joy_cam_id >= 0:
+		_joy_draw.draw_circle(_joy_cam_center,  JOY_R, Color(1,1,1,0.12))
+		_joy_draw.draw_circle(_joy_cam_center  + joy_cam  * JOY_R, 36, Color(1,1,1,0.40))
