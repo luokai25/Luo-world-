@@ -20,7 +20,6 @@ func _ready():
 
 func _on_inventory():
 	GameState.inventory_open = !GameState.inventory_open
-	GameState.notify("🎒 Inventory (screen coming next session)")
 
 func _process(delta):
 	player.joy_move = hud.joy_move
@@ -51,12 +50,14 @@ func _input(event):
 			KEY_E:   _on_interact()
 			KEY_F:   _on_use()
 			KEY_TAB: GameState.inventory_open = !GameState.inventory_open
+			KEY_C:   GameState.crafting_open = !GameState.crafting_open
 			KEY_1,KEY_2,KEY_3,KEY_4,KEY_5,KEY_6,KEY_7,KEY_8:
 				GameState.equipped_slot = event.scancode - KEY_1
 	if event is InputEventMouseButton and event.pressed and event.button_index == BUTTON_LEFT:
 		_on_attack()
 
 func _on_attack():
+	player.play_attack_swing()
 	if _nearest.empty(): return
 	var equipped = GameState.get_equipped()
 	var dmg = 5

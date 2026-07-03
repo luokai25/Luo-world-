@@ -1,21 +1,44 @@
-[gd_scene load_steps=6 format=2]
+[gd_scene load_steps=15 format=2]
 
 [ext_resource path="res://scripts/Main.gd" type="Script" id=1]
 [ext_resource path="res://scripts/World.gd" type="Script" id=2]
 [ext_resource path="res://scripts/Player.gd" type="Script" id=3]
 [ext_resource path="res://scripts/HUD.gd" type="Script" id=4]
+[ext_resource path="res://scripts/InventoryUI.gd" type="Script" id=5]
+[ext_resource path="res://scripts/CraftingUI.gd" type="Script" id=6]
 
 [sub_resource type="CapsuleShape" id=1]
 radius = 0.35
 height = 1.2
 
-[sub_resource type="CapsuleMesh" id=2]
-radius = 0.32
-mid_height = 0.9
+[sub_resource type="CubeMesh" id=2]
+size = Vector3( 0.30, 0.42, 0.16 )
 
 [sub_resource type="SpatialMaterial" id=3]
-albedo_color = Color( 0.35, 0.42, 0.30, 1 )
+albedo_color = Color( 0.34, 0.42, 0.30, 1 )
 roughness = 0.85
+
+[sub_resource type="SphereMesh" id=4]
+radius = 0.14
+height = 0.28
+
+[sub_resource type="SpatialMaterial" id=5]
+albedo_color = Color( 0.76, 0.60, 0.47, 1 )
+roughness = 0.75
+
+[sub_resource type="CylinderMesh" id=6]
+top_radius = 0.05
+bottom_radius = 0.06
+height = 0.5
+
+[sub_resource type="CylinderMesh" id=7]
+top_radius = 0.075
+bottom_radius = 0.08
+height = 0.62
+
+[sub_resource type="SpatialMaterial" id=8]
+albedo_color = Color( 0.22, 0.25, 0.30, 1 )
+roughness = 0.9
 
 [node name="Main" type="Spatial"]
 script = ExtResource( 1 )
@@ -32,16 +55,55 @@ script = ExtResource( 3 )
 [node name="CollisionShape" type="CollisionShape" parent="Player"]
 shape = SubResource( 1 )
 
-[node name="Body" type="MeshInstance" parent="Player"]
-transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0 )
+[node name="Rig" type="Spatial" parent="Player"]
+
+[node name="Torso" type="MeshInstance" parent="Player/Rig"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0 )
 mesh = SubResource( 2 )
 material/0 = SubResource( 3 )
 
-[node name="HandPoint" type="Spatial" parent="Player/Body"]
-transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32, 0.05, 0.22 )
+[node name="Head" type="MeshInstance" parent="Player/Rig"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 0 )
+mesh = SubResource( 4 )
+material/0 = SubResource( 5 )
+
+[node name="ArmL" type="Spatial" parent="Player/Rig"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, -0.24, 0.32, 0 )
+
+[node name="Mesh" type="MeshInstance" parent="Player/Rig/ArmL"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.25, 0 )
+mesh = SubResource( 6 )
+material/0 = SubResource( 5 )
+
+[node name="ArmR" type="Spatial" parent="Player/Rig"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0.24, 0.32, 0 )
+
+[node name="Mesh" type="MeshInstance" parent="Player/Rig/ArmR"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.25, 0 )
+mesh = SubResource( 6 )
+material/0 = SubResource( 5 )
+
+[node name="HandPoint" type="Spatial" parent="Player/Rig/ArmR"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.46, 0.03 )
+
+[node name="LegL" type="Spatial" parent="Player/Rig"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, -0.11, -0.30, 0 )
+
+[node name="Mesh" type="MeshInstance" parent="Player/Rig/LegL"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.31, 0 )
+mesh = SubResource( 7 )
+material/0 = SubResource( 8 )
+
+[node name="LegR" type="Spatial" parent="Player/Rig"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0.11, -0.30, 0 )
+
+[node name="Mesh" type="MeshInstance" parent="Player/Rig/LegR"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.31, 0 )
+mesh = SubResource( 7 )
+material/0 = SubResource( 8 )
 
 [node name="CameraPivot" type="Spatial" parent="Player"]
-transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 4.5 )
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 4.8 )
 
 [node name="Camera" type="Camera" parent="Player/CameraPivot"]
 fov = 68.0
@@ -409,3 +471,134 @@ margin_top = 0
 margin_right = 0
 margin_bottom = 70
 expand_icon = true
+
+[node name="InventoryPanel" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="Root" type="Control" parent="InventoryPanel"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource( 5 )
+
+[node name="Bg" type="ColorRect" parent="InventoryPanel/Root"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color( 0.02, 0.05, 0.02, 0.75 )
+
+[node name="Panel" type="Panel" parent="InventoryPanel/Root"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+margin_left = -410
+margin_top = -230
+margin_right = 410
+margin_bottom = 230
+
+[node name="Title" type="Label" parent="InventoryPanel/Root/Panel"]
+margin_left = 16
+margin_top = 12
+margin_right = 300
+margin_bottom = 44
+text = "INVENTORY"
+
+[node name="CloseBtn" type="Button" parent="InventoryPanel/Root/Panel"]
+anchor_left = 1.0
+anchor_right = 1.0
+margin_left = -56
+margin_top = 8
+margin_right = -8
+margin_bottom = 48
+text = "✕"
+
+[node name="CraftBtn" type="Button" parent="InventoryPanel/Root/Panel"]
+anchor_left = 1.0
+anchor_right = 1.0
+margin_left = -168
+margin_top = 8
+margin_right = -64
+margin_bottom = 48
+text = "CRAFT"
+
+[node name="Scroll" type="ScrollContainer" parent="InventoryPanel/Root/Panel"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 12
+margin_top = 56
+margin_right = -12
+margin_bottom = -92
+
+[node name="Grid" type="GridContainer" parent="InventoryPanel/Root/Panel/Scroll"]
+rect_min_size = Vector2( 760, 0 )
+columns = 8
+
+[node name="InfoName" type="Label" parent="InventoryPanel/Root/Panel"]
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 16
+margin_top = -84
+margin_right = -16
+margin_bottom = -58
+text = "Select an item"
+
+[node name="InfoDesc" type="Label" parent="InventoryPanel/Root/Panel"]
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 16
+margin_top = -54
+margin_right = -16
+margin_bottom = -10
+autowrap = true
+
+[node name="CraftingPanel" type="CanvasLayer" parent="."]
+layer = 11
+
+[node name="Root" type="Control" parent="CraftingPanel"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource( 6 )
+
+[node name="Bg" type="ColorRect" parent="CraftingPanel/Root"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color( 0.02, 0.05, 0.02, 0.75 )
+
+[node name="Panel" type="Panel" parent="CraftingPanel/Root"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+margin_left = -410
+margin_top = -230
+margin_right = 410
+margin_bottom = 230
+
+[node name="Title" type="Label" parent="CraftingPanel/Root/Panel"]
+margin_left = 16
+margin_top = 12
+margin_right = 300
+margin_bottom = 44
+text = "CRAFTING"
+
+[node name="CloseBtn" type="Button" parent="CraftingPanel/Root/Panel"]
+anchor_left = 1.0
+anchor_right = 1.0
+margin_left = -56
+margin_top = 8
+margin_right = -8
+margin_bottom = 48
+text = "✕"
+
+[node name="Scroll" type="ScrollContainer" parent="CraftingPanel/Root/Panel"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 12
+margin_top = 56
+margin_right = -12
+margin_bottom = -12
+
+[node name="List" type="VBoxContainer" parent="CraftingPanel/Root/Panel/Scroll"]
+rect_min_size = Vector2( 760, 0 )
+custom_constants/separation = 6
