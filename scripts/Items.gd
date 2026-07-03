@@ -191,3 +191,40 @@ func get_item(id: String) -> Dictionary:
 
 func get_recipe(id: String) -> Dictionary:
 	return RECIPES.get(id, {})
+
+# ── ICONS (real textures, not font glyphs — Android's default
+#    dynamic font doesn't render emoji, so we bake proper icon PNGs) ──
+const ICON_DIR = "res://assets/icons/"
+
+const SPECIFIC_ICONS = {
+	"stone_axe":        "axe",
+	"cooked_meat":      "meat",
+	"raw_meat":         "raw_meat",
+	"wooden_cup":       "cup_full",
+	"wooden_cup_empty": "cup_empty",
+	"wood_log":         "log",
+	"stone":            "stone",
+	"flint":            "flint",
+	"vine":             "vine",
+	"stick":            "stick",
+}
+
+const CATEGORY_FALLBACK = {
+	"tool":      "generic_tool",
+	"weapon":    "generic_weapon",
+	"food":      "generic_food",
+	"food_raw":  "generic_food",
+	"drink":     "cup_full",
+	"resource":  "generic_resource",
+	"structure": "generic_structure",
+	"armor":     "generic_tool",
+	"ammo":      "generic_resource",
+}
+
+func get_icon_path(item_id: String) -> String:
+	if SPECIFIC_ICONS.has(item_id):
+		return ICON_DIR + SPECIFIC_ICONS[item_id] + ".png"
+	var data = get_item(item_id)
+	var cat  = data.get("category", "resource")
+	var fallback = CATEGORY_FALLBACK.get(cat, "generic_resource")
+	return ICON_DIR + fallback + ".png"

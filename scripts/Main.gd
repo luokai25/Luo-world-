@@ -15,11 +15,18 @@ func _ready():
 		hud.get_node("Bottom/Actions/UseBtn").connect("pressed", self, "_on_use")
 	if hud.has_node("Bottom/Actions/JumpBtn"):
 		hud.get_node("Bottom/Actions/JumpBtn").connect("pressed", player, "jump")
+	if hud.has_node("Bottom/Actions/InventoryBtn"):
+		hud.get_node("Bottom/Actions/InventoryBtn").connect("pressed", self, "_on_inventory")
+
+func _on_inventory():
+	GameState.inventory_open = !GameState.inventory_open
+	GameState.notify("🎒 Inventory (screen coming next session)")
 
 func _process(delta):
 	player.joy_move = hud.joy_move
 	player.joy_cam  = hud.joy_cam
 	player.update_camera(delta)
+	world.player_pos = player.global_transform.origin
 
 	_nearest = world.nearest_object(player.global_transform.origin, player.reach)
 	hud.set_prompt(_get_prompt())

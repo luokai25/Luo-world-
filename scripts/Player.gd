@@ -19,11 +19,22 @@ var is_grounded: bool   = false
 var joy_move: Vector2   = Vector2.ZERO
 var joy_cam: Vector2    = Vector2.ZERO
 
-onready var cam_pivot = $CameraPivot
-onready var camera    = $CameraPivot/Camera
+onready var cam_pivot  = $CameraPivot
+onready var camera     = $CameraPivot/Camera
+onready var hand_point = $Body/HandPoint
 
 func _ready():
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	_equip_held_item()
+
+func _equip_held_item():
+	if hand_point == null:
+		return
+	var axe_scene = load("res://assets/models/stone_axe.glb")
+	if axe_scene:
+		var axe = axe_scene.instance()
+		axe.rotation_degrees = Vector3(-20, 0, 15)
+		hand_point.add_child(axe)
 
 func _physics_process(delta):
 	var on_floor = is_on_floor()

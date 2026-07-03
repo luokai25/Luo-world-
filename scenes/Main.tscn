@@ -24,7 +24,7 @@ script = ExtResource( 1 )
 script = ExtResource( 2 )
 
 [node name="Player" type="KinematicBody" parent="."]
-transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0 )
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0 )
 collision_layer = 2
 collision_mask = 1
 script = ExtResource( 3 )
@@ -36,6 +36,9 @@ shape = SubResource( 1 )
 transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0 )
 mesh = SubResource( 2 )
 material/0 = SubResource( 3 )
+
+[node name="HandPoint" type="Spatial" parent="Player/Body"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32, 0.05, 0.22 )
 
 [node name="CameraPivot" type="Spatial" parent="Player"]
 transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 4.5 )
@@ -144,16 +147,29 @@ margin_bottom = -14
 custom_constants/separation = 4
 
 [node name="Slot0" type="PanelContainer" parent="HUD/Bottom/Hotbar"]
+margin_left = 0
 margin_right = 60
 margin_bottom = 60
 rect_min_size = Vector2( 60, 60 )
 
-[node name="Icon" type="Label" parent="HUD/Bottom/Hotbar/Slot0"]
+[node name="Icon" type="TextureRect" parent="HUD/Bottom/Hotbar/Slot0"]
+margin_right = 60
+margin_bottom = 60
+expand = true
+stretch_mode = 5
+
+[node name="Count" type="Label" parent="HUD/Bottom/Hotbar/Slot0"]
+anchor_left = 1.0
+anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-align = 1
-valign = 1
-text = "🪓"
+margin_left = -22
+margin_top = -20
+margin_right = -2
+margin_bottom = -2
+align = 2
+valign = 2
+text = ""
 
 [node name="Slot1" type="PanelContainer" parent="HUD/Bottom/Hotbar"]
 margin_left = 64
@@ -161,12 +177,24 @@ margin_right = 124
 margin_bottom = 60
 rect_min_size = Vector2( 60, 60 )
 
-[node name="Icon" type="Label" parent="HUD/Bottom/Hotbar/Slot1"]
+[node name="Icon" type="TextureRect" parent="HUD/Bottom/Hotbar/Slot1"]
+margin_right = 60
+margin_bottom = 60
+expand = true
+stretch_mode = 5
+
+[node name="Count" type="Label" parent="HUD/Bottom/Hotbar/Slot1"]
+anchor_left = 1.0
+anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-align = 1
-valign = 1
-text = "🥩"
+margin_left = -22
+margin_top = -20
+margin_right = -2
+margin_bottom = -2
+align = 2
+valign = 2
+text = ""
 
 [node name="Slot2" type="PanelContainer" parent="HUD/Bottom/Hotbar"]
 margin_left = 128
@@ -174,12 +202,24 @@ margin_right = 188
 margin_bottom = 60
 rect_min_size = Vector2( 60, 60 )
 
-[node name="Icon" type="Label" parent="HUD/Bottom/Hotbar/Slot2"]
+[node name="Icon" type="TextureRect" parent="HUD/Bottom/Hotbar/Slot2"]
+margin_right = 60
+margin_bottom = 60
+expand = true
+stretch_mode = 5
+
+[node name="Count" type="Label" parent="HUD/Bottom/Hotbar/Slot2"]
+anchor_left = 1.0
+anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-align = 1
-valign = 1
-text = "🥤"
+margin_left = -22
+margin_top = -20
+margin_right = -2
+margin_bottom = -2
+align = 2
+valign = 2
+text = ""
 
 [node name="Slot3" type="PanelContainer" parent="HUD/Bottom/Hotbar"]
 margin_left = 192
@@ -187,11 +227,23 @@ margin_right = 252
 margin_bottom = 60
 rect_min_size = Vector2( 60, 60 )
 
-[node name="Icon" type="Label" parent="HUD/Bottom/Hotbar/Slot3"]
+[node name="Icon" type="TextureRect" parent="HUD/Bottom/Hotbar/Slot3"]
+margin_right = 60
+margin_bottom = 60
+expand = true
+stretch_mode = 5
+
+[node name="Count" type="Label" parent="HUD/Bottom/Hotbar/Slot3"]
+anchor_left = 1.0
+anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-align = 1
-valign = 1
+margin_left = -22
+margin_top = -20
+margin_right = -2
+margin_bottom = -2
+align = 2
+valign = 2
 text = ""
 
 [node name="Slot4" type="PanelContainer" parent="HUD/Bottom/Hotbar"]
@@ -200,11 +252,23 @@ margin_right = 316
 margin_bottom = 60
 rect_min_size = Vector2( 60, 60 )
 
-[node name="Icon" type="Label" parent="HUD/Bottom/Hotbar/Slot4"]
+[node name="Icon" type="TextureRect" parent="HUD/Bottom/Hotbar/Slot4"]
+margin_right = 60
+margin_bottom = 60
+expand = true
+stretch_mode = 5
+
+[node name="Count" type="Label" parent="HUD/Bottom/Hotbar/Slot4"]
+anchor_left = 1.0
+anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-align = 1
-valign = 1
+margin_left = -22
+margin_top = -20
+margin_right = -2
+margin_bottom = -2
+align = 2
+valign = 2
 text = ""
 
 [node name="Slot5" type="PanelContainer" parent="HUD/Bottom/Hotbar"]
@@ -213,11 +277,23 @@ margin_right = 380
 margin_bottom = 60
 rect_min_size = Vector2( 60, 60 )
 
-[node name="Icon" type="Label" parent="HUD/Bottom/Hotbar/Slot5"]
+[node name="Icon" type="TextureRect" parent="HUD/Bottom/Hotbar/Slot5"]
+margin_right = 60
+margin_bottom = 60
+expand = true
+stretch_mode = 5
+
+[node name="Count" type="Label" parent="HUD/Bottom/Hotbar/Slot5"]
+anchor_left = 1.0
+anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-align = 1
-valign = 1
+margin_left = -22
+margin_top = -20
+margin_right = -2
+margin_bottom = -2
+align = 2
+valign = 2
 text = ""
 
 [node name="Slot6" type="PanelContainer" parent="HUD/Bottom/Hotbar"]
@@ -226,11 +302,23 @@ margin_right = 444
 margin_bottom = 60
 rect_min_size = Vector2( 60, 60 )
 
-[node name="Icon" type="Label" parent="HUD/Bottom/Hotbar/Slot6"]
+[node name="Icon" type="TextureRect" parent="HUD/Bottom/Hotbar/Slot6"]
+margin_right = 60
+margin_bottom = 60
+expand = true
+stretch_mode = 5
+
+[node name="Count" type="Label" parent="HUD/Bottom/Hotbar/Slot6"]
+anchor_left = 1.0
+anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-align = 1
-valign = 1
+margin_left = -22
+margin_top = -20
+margin_right = -2
+margin_bottom = -2
+align = 2
+valign = 2
 text = ""
 
 [node name="Slot7" type="PanelContainer" parent="HUD/Bottom/Hotbar"]
@@ -239,11 +327,23 @@ margin_right = 508
 margin_bottom = 60
 rect_min_size = Vector2( 60, 60 )
 
-[node name="Icon" type="Label" parent="HUD/Bottom/Hotbar/Slot7"]
+[node name="Icon" type="TextureRect" parent="HUD/Bottom/Hotbar/Slot7"]
+margin_right = 60
+margin_bottom = 60
+expand = true
+stretch_mode = 5
+
+[node name="Count" type="Label" parent="HUD/Bottom/Hotbar/Slot7"]
+anchor_left = 1.0
+anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-align = 1
-valign = 1
+margin_left = -22
+margin_top = -20
+margin_right = -2
+margin_bottom = -2
+align = 2
+valign = 2
 text = ""
 
 [node name="Actions" type="Control" parent="HUD/Bottom"]
@@ -266,7 +366,7 @@ margin_left = -170
 margin_top = -156
 margin_right = -84
 margin_bottom = -70
-text = "⚔"
+expand_icon = true
 
 [node name="InteractBtn" type="Button" parent="HUD/Bottom/Actions"]
 anchor_left = 1.0
@@ -277,7 +377,7 @@ margin_left = -84
 margin_top = -216
 margin_right = 0
 margin_bottom = -130
-text = "E"
+expand_icon = true
 
 [node name="UseBtn" type="Button" parent="HUD/Bottom/Actions"]
 anchor_left = 1.0
@@ -288,7 +388,7 @@ margin_left = -280
 margin_top = -156
 margin_right = -194
 margin_bottom = -70
-text = "USE"
+expand_icon = true
 
 [node name="JumpBtn" type="Button" parent="HUD/Bottom/Actions"]
 anchor_left = 1.0
@@ -299,4 +399,13 @@ margin_left = -84
 margin_top = -320
 margin_right = 0
 margin_bottom = -234
-text = "↑"
+expand_icon = true
+
+[node name="InventoryBtn" type="Button" parent="HUD/Bottom/Actions"]
+anchor_left = 1.0
+anchor_top = 0.0
+margin_left = -84
+margin_top = 0
+margin_right = 0
+margin_bottom = 70
+expand_icon = true
