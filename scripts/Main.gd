@@ -18,6 +18,12 @@ func _ready():
 	if hud.has_node("Bottom/Actions/InventoryBtn"):
 		hud.get_node("Bottom/Actions/InventoryBtn").connect("pressed", self, "_on_inventory")
 
+func _notification(what):
+	if what == MainLoop.NOTIFICATION_WM_GO_BACK_REQUEST \
+	or what == MainLoop.NOTIFICATION_APP_PAUSED \
+	or what == MainLoop.NOTIFICATION_WM_QUIT_REQUEST:
+		SaveManager.save_game()
+
 func _on_inventory():
 	GameState.inventory_open = !GameState.inventory_open
 
@@ -101,3 +107,4 @@ func _on_interact():
 
 func _on_use():
 	GameState.use_equipped()
+	SaveManager.save_game()

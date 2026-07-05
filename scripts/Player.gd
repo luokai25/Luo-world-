@@ -1,5 +1,6 @@
 extends KinematicBody
-# 3rd person player - procedural humanoid rig, walk/run/attack/idle animation
+# 3rd person player - real rigged/skinned/animated human (CesiumMan glTF sample,
+# Khronos Group, CC-BY 4.0) replacing the old primitive-box rig.
 
 export var move_speed: float    = 5.0
 export var run_speed: float     = 9.0
@@ -10,6 +11,10 @@ export var cam_dist: float      = 4.8
 export var cam_height: float    = 2.2
 export var reach: float         = 3.0
 
+# Character is ~1.51m tall natively; scale to a believable adult height
+const CHAR_SCALE = 1.16
+const CHAR_Y_OFFSET = -0.85   # aligns modeled feet (local y=0) with collision bottom
+
 var velocity: Vector3   = Vector3.ZERO
 var cam_yaw: float      = 0.0
 var cam_pitch: float    = -0.3
@@ -18,37 +23,68 @@ var is_grounded: bool   = false
 var joy_move: Vector2   = Vector2.ZERO
 var joy_cam: Vector2    = Vector2.ZERO
 
-onready var cam_pivot  = $CameraPivot
-onready var camera     = $CameraPivot/Camera
+onready var cam_pivot = $CameraPivot
+onready var camera    = $CameraPivot/Camera
 
-onready var torso      = $Rig/Torso
-onready var head       = $Rig/Head
-onready var arm_l      = $Rig/ArmL
-onready var arm_r      = $Rig/ArmR
-onready var leg_l      = $Rig/LegL
-onready var leg_r      = $Rig/LegR
-onready var hand_point = $Rig/ArmR/HandPoint
+var char_root: Spatial
+var skeleton: Skeleton
+var anim_player: AnimationPlayer
+var bone_attach: BoneAttachment
 
-var _anim_t: float        = 0.0
-var _attack_timer: float  = 0.0
-const ATTACK_DURATION     = 0.35
-var _base_torso_y: float  = 0.0
+const ARM_SHOULDER = 11
+const ARM_ELBOW     = 12
+const ARM_WRIST     = 13
+const HAND_BONE_NAME = "Skeleton_arm_joint_R__3_"
+
+var _attack_timer: float = 0.0
+const ATTACK_DURATION    = 0.4
+var _current_playback_speed: float = 0.0
 
 func _ready():
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	_load_character()
 	_equip_held_item()
-	if torso:
-		_base_torso_y = torso.translation.y
+
+func _load_character():
+	var scene = load("res://assets/models/character/CesiumMan.glb")
+	if scene == null:
+		return
+	char_root = scene.instance()
+	char_root.scale = Vector3(CHAR_SCALE, CHAR_SCALE, CHAR_SCALE)
+	char_root.translation = Vector3(0, CHAR_Y_OFFSET, 0)
+	add_child(char_root)
+
+	skeleton    = _find_node_of_type(char_root, "Skeleton")
+	anim_player = _find_node_of_type(char_root, "AnimationPlayer")
+
+	if anim_player:
+		anim_player.play("Animation")
+		anim_player.playback_speed = 0.0
+
+	if skeleton:
+		bone_attach = BoneAttachment.new()
+		bone_attach.bone_name = HAND_BONE_NAME
+		skeleton.add_child(bone_attach)
 
 func _equip_held_item():
-	if hand_point == null:
+	if bone_attach == null:
 		return
 	var axe_scene = load("res://assets/models/stone_axe.glb")
 	if axe_scene:
 		var axe = axe_scene.instance()
-		axe.rotation_degrees = Vector3(0, 0, 160)
-		axe.translation = Vector3(0, -0.06, 0.02)
-		hand_point.add_child(axe)
+		axe.scale = Vector3(1, 1, 1) / CHAR_SCALE   # counter parent scale, keep true size
+		axe.rotation_degrees = Vector3(90, 0, 100)
+		axe.translation = Vector3(0.02, -0.02, 0.05)
+		bone_attach.add_child(axe)
+
+func _find_node_of_type(node, class_name_str: String):
+	if node.get_class() == class_name_str:
+		return node
+	for c in node.get_children():
+		var r = _find_node_of_type(c, class_name_str)
+		if r:
+			return r
+	return null
 
 func _physics_process(delta):
 	var on_floor = is_on_floor()
@@ -90,47 +126,42 @@ func _process(delta):
 	_animate(delta)
 
 func _animate(delta):
-	var horiz_speed = Vector2(velocity.x, velocity.z).length()
-	var moving = horiz_speed > 0.4
+	if anim_player == null:
+		return
 
-	# Attack swing takes priority over the right arm
 	if _attack_timer > 0.0:
 		_attack_timer -= delta
-		var t = 1.0 - clamp(_attack_timer / ATTACK_DURATION, 0.0, 1.0)
-		var swing = sin(t * PI)
-		if arm_r:
-			arm_r.rotation.x = -1.7 * swing
-			arm_r.rotation.z = 0.3 * swing
-	elif arm_r:
-		arm_r.rotation.z = lerp(arm_r.rotation.z, 0.0, 10.0 * delta)
+		_apply_attack_pose(delta)
+		if _attack_timer <= 0.0:
+			anim_player.play("Animation")   # resumes from retained position
+		return
 
-	if moving:
-		var freq = 9.5 if horiz_speed > move_speed + 0.5 else 6.5
-		_anim_t += delta * freq
-		var swing = sin(_anim_t) * 0.55
-		if leg_l: leg_l.rotation.x = swing
-		if leg_r: leg_r.rotation.x = -swing
-		if arm_l: arm_l.rotation.x = -swing * 0.75
-		if _attack_timer <= 0.0 and arm_r:
-			arm_r.rotation.x = swing * 0.75
-		if torso:
-			torso.rotation.z = sin(_anim_t * 2.0) * 0.025
-			torso.translation.y = _base_torso_y
-		if head:
-			head.rotation.z = sin(_anim_t * 2.0) * -0.02
-	else:
-		_anim_t += delta * 1.4
-		var breathe = sin(_anim_t)
-		if torso:
-			torso.translation.y = _base_torso_y + breathe * 0.012
-			torso.rotation.z = lerp(torso.rotation.z, 0.0, 6.0 * delta)
-		if head:
-			head.rotation.z = lerp(head.rotation.z, 0.0, 6.0 * delta)
-		if leg_l: leg_l.rotation.x = lerp(leg_l.rotation.x, 0.0, 8.0 * delta)
-		if leg_r: leg_r.rotation.x = lerp(leg_r.rotation.x, 0.0, 8.0 * delta)
-		if arm_l: arm_l.rotation.x = lerp(arm_l.rotation.x, 0.0, 8.0 * delta)
-		if _attack_timer <= 0.0 and arm_r:
-			arm_r.rotation.x = lerp(arm_r.rotation.x, 0.0, 8.0 * delta)
+	var horiz_speed = Vector2(velocity.x, velocity.z).length()
+	var target_speed = 0.0
+	if horiz_speed > 0.4:
+		var ratio = horiz_speed / move_speed
+		target_speed = clamp(ratio * 0.9, 0.6, 1.8)
+	_current_playback_speed = lerp(_current_playback_speed, target_speed, 6.0 * delta)
+	anim_player.playback_speed = _current_playback_speed
+
+func _apply_attack_pose(delta):
+	if skeleton == null:
+		return
+	if anim_player.playback_speed != 0.0:
+		anim_player.stop(false)   # freeze locomotion, keep last pose, take manual control
+		anim_player.playback_speed = 0.0
+
+	var t = 1.0 - clamp(_attack_timer / ATTACK_DURATION, 0.0, 1.0)
+	var swing = sin(t * PI)
+
+	var shoulder_rest = skeleton.get_bone_rest(ARM_SHOULDER)
+	var elbow_rest    = skeleton.get_bone_rest(ARM_ELBOW)
+
+	var shoulder_swing = Basis(Vector3(1, 0, 0), -2.0 * swing)
+	var elbow_swing     = Basis(Vector3(1, 0, 0), -0.8 * swing)
+
+	skeleton.set_bone_pose(ARM_SHOULDER, Transform(shoulder_rest.basis * shoulder_swing, shoulder_rest.origin))
+	skeleton.set_bone_pose(ARM_ELBOW,     Transform(elbow_rest.basis * elbow_swing, elbow_rest.origin))
 
 func play_attack_swing():
 	_attack_timer = ATTACK_DURATION

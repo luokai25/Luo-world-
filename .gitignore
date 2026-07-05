@@ -7,3 +7,4 @@ android.keystore
 *.import
 export.cfg
 export_credentials.cfg
+*.material
