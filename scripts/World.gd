@@ -193,9 +193,13 @@ func _add_water_plane(x, z, size):
 
 # ── TREES ────────────────────────────────────
 func _place_trees():
+	var tree_paths = [
+		"tree_oak_1", "tree_oak_2", "tree_oak_3", "tree_oak_4", "tree_oak_20",
+		"tree_palm_10", "tree_palm_11", "tree_palm_12"
+	]
 	var tree_models = []
-	for i in range(6):
-		var loaded = load("res://assets/models/tree_%d.glb" % i)
+	for name in tree_paths:
+		var loaded = load("res://assets/models/%s.glb" % name)
 		if loaded: tree_models.append(loaded)
 
 	for i in range(600):
@@ -247,7 +251,7 @@ func _make_fallback_tree() -> Spatial:
 # ── ROCKS ────────────────────────────────────
 func _place_rocks():
 	var rock_models = []
-	for i in range(4):
+	for i in range(6):
 		var loaded = load("res://assets/models/rock_%d.glb" % i)
 		if loaded: rock_models.append(loaded)
 
@@ -309,6 +313,12 @@ func _place_collectibles():
 		var y = get_height(x, z)
 		objects.append({"type":"item","pos":Vector3(x,y+0.1,z),"item_id":"fruit",
 			"count":rng.randi_range(1,2),"health":1,"drops":[["fruit",1]],"node":null})
+	for i in range(120):
+		var x=rng.randf_range(-HALF+2,HALF-2); var z=rng.randf_range(-HALF+2,HALF-2)
+		if abs(x)<6 and abs(z)<6: continue
+		var y = get_height(x, z)
+		objects.append({"type":"item","pos":Vector3(x,y+0.1,z),"item_id":"wild_seeds",
+			"count":rng.randi_range(1,3),"health":1,"drops":[["wild_seeds",rng.randi_range(1,3)]],"node":null})
 
 # ── ANIMALS ──────────────────────────────────
 var animal_models: Dictionary = {}

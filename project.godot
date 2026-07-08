@@ -21,6 +21,7 @@ config/icon="res://assets/icon.png"
 Items="*res://scripts/Items.gd"
 GameState="*res://scripts/GameState.gd"
 SaveManager="*res://scripts/SaveManager.gd"
+Farming="*res://scripts/Farming.gd"
 
 [display]
 

@@ -133,6 +133,21 @@ const ITEMS = {
 		"stackable": false, "max_stack": 1,
 		"description": "Basic frame for a lean-to shelter."
 	},
+	"wild_seeds": {
+		"name": "Wild Seeds", "icon": "🌱", "category": "resource",
+		"stackable": true, "max_stack": 20,
+		"description": "Seeds gathered from wild grass. Plant them in a farm plot."
+	},
+	"grain": {
+		"name": "Grain", "icon": "🌾", "category": "food",
+		"nutrition": 18, "hydration": 2, "stackable": true, "max_stack": 30,
+		"description": "Harvested grain from a cultivated plot. Can be eaten or cooked."
+	},
+	"farm_plot": {
+		"name": "Farm Plot", "icon": "🟫", "category": "structure",
+		"stackable": false, "max_stack": 1,
+		"description": "A tilled plot of soil. Plant wild seeds and tend them until harvest."
+	},
 }
 
 const RECIPES = {
@@ -183,6 +198,10 @@ const RECIPES = {
 	"shelter_frame": {
 		"name": "Shelter Frame", "inputs": {"wood_log": 6, "rope": 4},
 		"output": ["shelter_frame", 1], "time": 20.0
+	},
+	"farm_plot": {
+		"name": "Farm Plot", "inputs": {"wood_log": 2, "stick": 4},
+		"output": ["farm_plot", 1], "time": 6.0
 	},
 }
 

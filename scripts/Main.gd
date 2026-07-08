@@ -5,6 +5,7 @@ onready var player = $Player
 onready var hud    = $HUD
 
 var _nearest: Dictionary = {}
+var _nearest_plot: Dictionary = {}
 
 func _ready():
 	if hud.has_node("Bottom/Actions/AttackBtn"):
@@ -34,7 +35,12 @@ func _process(delta):
 	world.player_pos = player.global_transform.origin
 
 	_nearest = world.nearest_object(player.global_transform.origin, player.reach)
-	hud.set_prompt(_get_prompt())
+	_nearest_plot = Farming.nearest_plot(player.global_transform.origin, 3.0)
+
+	if not _nearest_plot.empty():
+		hud.set_prompt(Farming.get_prompt(_nearest_plot))
+	else:
+		hud.set_prompt(_get_prompt())
 
 func _get_prompt() -> String:
 	if _nearest.empty(): return ""
@@ -87,6 +93,9 @@ func _on_attack():
 				GameState.remove_item(slot.item_id, 1)
 
 func _on_interact():
+	if not _nearest_plot.empty():
+		Farming.interact(_nearest_plot)
+		return
 	if _nearest.empty(): return
 	match _nearest.get("type",""):
 		"item":
@@ -106,5 +115,17 @@ func _on_interact():
 			_on_attack()
 
 func _on_use():
+	var equipped = GameState.get_equipped()
+	if equipped.item_id == "farm_plot":
+		_place_farm_plot()
+		return
 	GameState.use_equipped()
 	SaveManager.save_game()
+
+func _place_farm_plot():
+	var fwd = Vector3(sin(player.rotation.y), 0, cos(player.rotation.y))
+	var place_pos = player.global_transform.origin + fwd * 1.8
+	place_pos.y = world.get_height(place_pos.x, place_pos.z)
+	Farming.place_plot(world, place_pos)
+	GameState.remove_item("farm_plot", 1)
+	GameState.notify("🟫 Farm plot placed")
